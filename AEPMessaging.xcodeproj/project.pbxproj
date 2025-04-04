@@ -198,6 +198,8 @@
 		44DFBD558578CFDCD4A9A476 /* Pods_E2EFunctionalTestApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A44BD44CB3A7DA5EBB972652 /* Pods_E2EFunctionalTestApp.framework */; };
 		56B08B522365B6DC2B556B40 /* Pods_UnitTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D685E0AE5C614B4788DE869A /* Pods_UnitTests.framework */; };
 		75B4333CC0B4F5BFAC707055 /* Pods_MessagingDemoAppObjC.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28E46BC7A8F3939CF2DDDC8F /* Pods_MessagingDemoAppObjC.framework */; };
+		75E23FA12D9DC02C003538D8 /* JSONTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75E23FA02D9DC02C003538D8 /* JSONTemplate.swift */; };
+		75E23FA32D9DC37D003538D8 /* JSONTemplateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75E23FA22D9DC37D003538D8 /* JSONTemplateView.swift */; };
 		899E1724E9B5AD078B0710E5 /* Pods_IntegrationTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CA09063EA0248339C5B2C535 /* Pods_IntegrationTests.framework */; };
 		8C4723D49BD3F1EB4060FEAE /* Pods_FunctionalTestApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DB9F1A791A757B3C68D23B9D /* Pods_FunctionalTestApp.framework */; };
 		8DEEA93D16C40CA285E20AD5 /* Pods_MessagingDemoAppSwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 91A11E37A49E14EB847FB2DF /* Pods_MessagingDemoAppSwiftUI.framework */; };
@@ -636,6 +638,8 @@
 		4DBE357820DAAEE02A221D75 /* Pods-E2EFunctionalTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-E2EFunctionalTests.debug.xcconfig"; path = "Target Support Files/Pods-E2EFunctionalTests/Pods-E2EFunctionalTests.debug.xcconfig"; sourceTree = "<group>"; };
 		53FA287A1BFC0714D83A6419 /* Pods-UnitTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-UnitTests.debug.xcconfig"; path = "Target Support Files/Pods-UnitTests/Pods-UnitTests.debug.xcconfig"; sourceTree = "<group>"; };
 		69F23BE01498B5A36EEE4CDC /* Pods_MessagingDemoApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_MessagingDemoApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		75E23FA02D9DC02C003538D8 /* JSONTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTemplate.swift; sourceTree = "<group>"; };
+		75E23FA22D9DC37D003538D8 /* JSONTemplateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTemplateView.swift; sourceTree = "<group>"; };
 		7BB455BF61D9D261AC490547 /* Pods-MessagingDemoAppSwiftUI.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MessagingDemoAppSwiftUI.debug.xcconfig"; path = "Target Support Files/Pods-MessagingDemoAppSwiftUI/Pods-MessagingDemoAppSwiftUI.debug.xcconfig"; sourceTree = "<group>"; };
 		91A11E37A49E14EB847FB2DF /* Pods_MessagingDemoAppSwiftUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_MessagingDemoAppSwiftUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		92085982251BEB7100B9C65A /* MessagingDemoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MessagingDemoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1265,6 +1269,7 @@
 				B6F7CB9C2CC2089A00C35C64 /* BaseTemplate.swift */,
 				B6F7CB9D2CC2089A00C35C64 /* ContentCardTemplate.swift */,
 				B6F7CB9E2CC2089A00C35C64 /* SmallImageTemplate.swift */,
+				75E23FA02D9DC02C003538D8 /* JSONTemplate.swift */,
 				B6F7CB9F2CC2089A00C35C64 /* TemplateBuilder.swift */,
 				B6F7CBA02CC2089A00C35C64 /* TemplateEventHandler.swift */,
 			);
@@ -1502,6 +1507,7 @@
 				091881F22A16C2A200615481 /* InAppView.swift */,
 				091881F52A16C2D600615481 /* CardsView.swift */,
 				092A77F12A757CB40026D325 /* CodeBasedView.swift */,
+				75E23FA22D9DC37D003538D8 /* JSONTemplateView.swift */,
 			);
 			path = AppPages;
 			sourceTree = "<group>";
@@ -2363,6 +2369,7 @@
 				0969D6342A75D55E00A00BF7 /* CustomImageView.swift in Sources */,
 				091881E92A16BAE300615481 /* HomeView.swift in Sources */,
 				B6F7CC972CC873AB00C35C64 /* AppDelegate.swift in Sources */,
+				75E23FA32D9DC37D003538D8 /* JSONTemplateView.swift in Sources */,
 				092A77F22A757CB40026D325 /* CodeBasedView.swift in Sources */,
 				0969D63C2A7A0EF600A00BF7 /* CustomTextView.swift in Sources */,
 				B6F7CC952CC80F4800C35C64 /* Constants.swift in Sources */,
@@ -2520,6 +2527,7 @@
 				B69573C82CD4447F0027E376 /* AEPBundleImageView.swift in Sources */,
 				B6389A492A9B32D400B72FB4 /* PushTrackingStatus.swift in Sources */,
 				09F5D9402B5CF35F00117437 /* PropositionInteraction.swift in Sources */,
+				75E23FA12D9DC02C003538D8 /* JSONTemplate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

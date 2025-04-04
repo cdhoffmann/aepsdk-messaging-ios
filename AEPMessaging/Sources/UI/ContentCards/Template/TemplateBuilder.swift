@@ -27,6 +27,10 @@ enum TemplateBuilder {
         switch schemaData.templateType {
         case .smallImage:
             return SmallImageTemplate(schemaData, customizer)
+        case .jsonTemplate:
+            // Special handling for JSON template
+            // No customizer needed as the styling is defined in the JSON
+            return JSONTemplate(schemaData)
         case .unknown:
             // Currently unsupported template types
             return nil

@@ -15,7 +15,13 @@ import Foundation
 /// An enumeration representing the types of content card templates.
 @available(iOS 15.0, *)
 public enum ContentCardTemplateType: String {
+    /// A template with a small image
     case smallImage = "SmallImage"
+    
+    /// A flexible JSON-defined template
+    case jsonTemplate = "json-template"
+    
+    /// An unknown template type that is not yet supported
     case unknown = "Unknown"
 
     // Initializer to create an enum case from a string
