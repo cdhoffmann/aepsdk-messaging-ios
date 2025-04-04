@@ -24,169 +24,7 @@ struct JSONTemplateView: View{
     @State private var viewLoaded: Bool = false
     
     // Sample JSON for the content card
-    private let sampleJSON = """
-    {
-      "type": "view",
-      "style": {
-        "flexDirection": "row",
-        "padding": 16
-      },
-      "child": [
-        {
-          "type": "view",
-          "child": [
-            {
-              "type": "image",
-              "tyle": {
-                "width": 90,
-                "height": 90,
-                "marginBottom": 12,
-                "borderRadius": 8
-              },
-              "url": "https://analyticsindiamag.com/wp-content/uploads/2023/03/adobe.jpeg"
-            }
-          ]
-        },
-        {
-          "type": "view",
-          "style": {
-            "flexDirection": "column",
-            "padding": 14,
-            "marginLeft": 12
-          },
-          "child": [
-            {
-              "type": "text",
-              "tyle": {
-                "fontSize": 18,
-                "fontWeight": "400",
-                "marginBottom": 12,
-                "borderRadius": 8
-              },
-              "content": "Testing Adobe images"
-            },
-            {
-              "type": "text",
-              "tyle": {
-                "fontSize": 16
-              },
-              "content": "This image is picked from web"
-            }
-          ]
-        }
-      ]
-    }
-    """
-    
-    // Another sample with a different layout
-    private let alternativeJSON = """
-    {
-      "type": "view",
-      "style": {
-        "flexDirection": "column",
-        "padding": 16,
-        "backgroundColor": "gray"
-      },
-      "child": [
-        {
-          "type": "text",
-          "tyle": {
-            "fontSize": 24,
-            "fontWeight": "bold",
-            "marginBottom": 12
-          },
-          "content": "JSON Template Demo"
-        },
-        {
-          "type": "view",
-          "style": {
-            "flexDirection": "row",
-            "padding": 12,
-            "backgroundColor": "white",
-            "borderRadius": 8
-          },
-          "child": [
-            {
-              "type": "image",
-              "tyle": {
-                "width": 120,
-                "height": 120,
-                "borderRadius": 8
-              },
-              "url": "https://www.adobe.com/content/dam/cc/icons/Adobe_Corporate_Horizontal_Red_HEX.svg"
-            },
-            {
-              "type": "view",
-              "style": {
-                "marginLeft": 16
-              },
-              "child": [
-                {
-                  "type": "text",
-                  "tyle": {
-                    "fontSize": 18,
-                    "fontWeight": "semibold",
-                    "marginBottom": 8
-                  },
-                  "content": "Adobe Experience Platform"
-                },
-                {
-                  "type": "text",
-                  "tyle": {
-                    "fontSize": 14
-                  },
-                  "content": "Mobile SDK with flexible content card layouts"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "type": "view",
-          "style": {
-            "flexDirection": "column",
-            "marginTop": 16,
-            "alignItems": "center"
-          },
-          "child": [
-            {
-              "type": "button",
-              "label": "Learn More",
-              "actionUrl": "https://developer.adobe.com/client-sdks/documentation/",
-              "interactionId": "learn_more_button_clicked",
-              "tyle": {
-                "backgroundColor": "blue",
-                "textColor": "white",
-                "borderRadius": 8,
-                "fontSize": 16,
-                "fontWeight": "semibold",
-                "paddingVertical": 12,
-                "paddingHorizontal": 20,
-                "marginTop": 8
-              }
-            },
-            {
-              "type": "button",
-              "label": "Dismiss",
-              "interactionId": "dismiss_button_clicked",
-              "tyle": {
-                "backgroundColor": "gray",
-                "textColor": "white",
-                "borderRadius": 8,
-                "fontSize": 14,
-                "paddingVertical": 8,
-                "paddingHorizontal": 16,
-                "marginTop": 8
-              }
-            }
-          ]
-        }
-      ]
-    }
-    """
-    
-    // New sample with weights, borders, and content scale
-    private let weightBorderJSON = """
+    private let largeImageJSON = """
     {
       "type": "view",
       "style": {
@@ -196,12 +34,11 @@ struct JSONTemplateView: View{
         "borderColor": "#FF0000",
         "borderRadius": 8
       },
-      "child": [
+      "children": [
         {
           "type": "image",
           "style": {
-            "width": -1,
-            "height": 200,
+            "widthPercentage": "100%",
             "borderRadius": 8,
             "contentScale": "crop"
           },
@@ -216,24 +53,21 @@ struct JSONTemplateView: View{
             "marginTop": 12,
             "marginBottom": 12
           },
-          "child": [
+          "children": [
             {
               "type": "view",
               "style": {
                 "flexDirection": "column",
-                "weight": 1,
-                "borderWidth": 1,
-                "borderColor": "#0000FF",
-                "borderRadius": 4,
-                "padding": 8
+                "flex": 1
               },
-              "child": [
+              "children": [
                 {
                   "type": "text",
                   "style": {
                     "fontSize": 18,
                     "fontWeight": "400",
-                    "marginBottom": 12
+                    "marginBottom": 12,
+                    "borderRadius": 8
                   },
                   "content": "Title 1"
                 },
@@ -250,20 +84,15 @@ struct JSONTemplateView: View{
               "type": "view",
               "style": {
                 "flexDirection": "column",
-                "weight": 1,
-                "borderWidth": 1,
-                "borderColor": "#00FF00",
-                "borderRadius": 4,
-                "marginLeft": 8,
-                "padding": 8
+                "flex": 1
               },
-              "child": [
+              "children": [
                 {
                   "type": "text",
                   "style": {
                     "fontSize": 18,
                     "fontWeight": "400",
-                    "marginBottom": 12
+                    "borderRadius": 8
                   },
                   "content": "Title 2"
                 },
@@ -277,21 +106,45 @@ struct JSONTemplateView: View{
               ]
             }
           ]
+        }
+      ]
+    }
+    """
+    
+    // Another sample with a different layout
+    private let imageOnlyJSON = """
+
+    {
+      "type": "view",
+      "style": {
+        "flexDirection": "box",
+        "alignItems": "center",
+        "padding": 16,
+        "borderWidth": 2,
+        "borderColor": "#FF0000",
+        "borderRadius": 8
+      },
+      "children": [
+        {
+          "type": "image",
+          "style": {
+            "widthPercentage": "100%",
+            "borderRadius": 8,
+            "contentScale": "crop"
+          },
+          "url": "https://analyticsindiamag.com/wp-content/uploads/2023/03/adobe.jpeg"
         },
         {
-          "type": "button",
-          "label": "Cross-Platform Design",
-          "interactionId": "cross_platform_clicked",
+          "type": "text",
           "style": {
-            "backgroundColor": "#FF0000",
-            "textColor": "white",
-            "borderRadius": 8,
-            "fontSize": 16,
+            "fontSize": 24,
             "fontWeight": "bold",
-            "paddingVertical": 10,
-            "paddingHorizontal": 16,
-            "marginTop": 8
-          }
+            "color": "#FFFFFF",
+            "padding": 8,
+            "borderRadius": 4,
+            "justifyContent": "bottom"
+          },
+          "content": "This is an image only template"
         }
       ]
     }
@@ -343,9 +196,9 @@ struct JSONTemplateView: View{
                     
                     if showCard {
                         Picker("Example", selection: $selectedExample) {
-                            Text("Basic Layout").tag(0)
+                            Text("Large Image").tag(0)
                             Text("Server Cards").tag(1)
-                            Text("Weight & Borders").tag(2)
+                            Text("Image Only").tag(2)
                         }
                         .pickerStyle(SegmentedPickerStyle())
                         .padding(.top, 8)
@@ -374,12 +227,10 @@ struct JSONTemplateView: View{
                                 switch selectedExample {
                                 case 0:
                                     // First example card (static)
-                                    if let schemaData = createMockSchemaData(jsonString: sampleJSON),
+                                    if let schemaData = createMockSchemaData(jsonString: largeImageJSON),
                                        let template = JSONTemplate(schemaData) {
                                         template.view
                                             .background(Color.white)
-                                            .cornerRadius(12)
-                                            .shadow(radius: 5)
                                             .padding(.horizontal)
                                     } else {
                                         Text("Error creating template")
@@ -403,13 +254,11 @@ struct JSONTemplateView: View{
                                     }
                                 case 2:
                                     // Weight and borders example (static)
-                                    if let schemaData = createMockSchemaData(jsonString: weightBorderJSON),
+                                    if let schemaData = createMockSchemaData(jsonString: imageOnlyJSON),
                                        let template = JSONTemplate(schemaData) {
                                         template.view
                                             .background(Color.white)
-//                                            .cornerRadius(12)
-//                                            .shadow(radius: 5)
-//                                            .padding(.horizontal)
+                                            .padding(.horizontal)
                                     } else {
                                         Text("Error creating template")
                                             .foregroundColor(.red)
