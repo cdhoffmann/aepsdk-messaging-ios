@@ -71,59 +71,113 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         }
     }
     
+    /// Renders a child component with appropriate layout properties
+    @ViewBuilder
+    private func renderChild(childJson: [String: Any], isHorizontal: Bool) -> some View {
+        let childStyle = childJson["style"] as? [String: Any] ?? [:]
+        
+        // Support both "weight" (original) and "flex" (new format)
+        let childWeight = childStyle["flex"] as? Int ?? childStyle["weight"] as? Int ?? 0
+        
+        // Support "widthPercentage" as a string percentage
+        let widthPercentage = childStyle["widthPercentage"] as? String
+        
+        if let percentStr = widthPercentage, percentStr.hasSuffix("%"),
+           let percentValue = Double(percentStr.dropLast()) {
+            // Set width as a fraction of the container
+            renderJSON(json: childJson)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .modifier(WidthPercentageModifier(percentage: percentValue))
+        } else if childWeight > 0 {
+            // If weight/flex is specified, use flexible frame with weight as layout priority
+            if isHorizontal {
+                renderJSON(json: childJson)
+                    .frame(maxWidth: .infinity)
+                    .layoutPriority(Double(childWeight))
+            } else {
+                renderJSON(json: childJson)
+                    .frame(maxHeight: .infinity)
+                    .layoutPriority(Double(childWeight))
+            }
+        } else {
+            // Otherwise render normally
+            renderJSON(json: childJson)
+        }
+    }
+    
     /// Renders a view component with its children
     @ViewBuilder
     private func renderViewComponent(_ json: [String: Any]) -> some View {
         let style = json["style"] as? [String: Any] ?? [:]
-        let children = json["child"] as? [[String: Any]] ?? []
+        // Support both "child" (original) and "children" (new format)
+        let children = (json["children"] as? [Any])?.compactMap { $0 as? [String: Any] } ??
+                      (json["child"] as? [[String: Any]] ?? [])
         
         // Extract style properties
         let flexDirection = style["flexDirection"] as? String ?? "column"
         let padding = CGFloat(style["padding"] as? Int ?? 0)
+        let justifyContent = style["justifyContent"] as? String ?? "start"
+        
+        // Map justifyContent value to SwiftUI alignment
+        let alignment: HorizontalAlignment = mapJustifyContentToAlignment(justifyContent)
+        let verticalAlignment: VerticalAlignment = mapJustifyContentToVerticalAlignment(justifyContent)
         
         // Create container based on flex direction
         Group {
             if flexDirection == "row" {
-                HStack(alignment: .top, spacing: 0) {
-                    ForEach(0..<children.count, id: \.self) { index in
-                        let childJson = children[index]
-                        let childStyle = childJson["style"] as? [String: Any] ?? [:]
-                        let childWeight = childStyle["weight"] as? Int ?? 0
-                        
-                        if childWeight > 0 {
-                            // If weight is specified, use flexible frame with weight as layout priority
-                            self.renderJSON(json: childJson)
-                                .frame(maxWidth: .infinity)
-                                .layoutPriority(Double(childWeight))
-                        } else {
-                            // Otherwise render normally
-                            self.renderJSON(json: childJson)
-                        }
+                HStack(alignment: verticalAlignment, spacing: 0) {
+                    ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
+                        self.renderChild(childJson: childJson, isHorizontal: true)
                     }
                 }
                 .padding(padding)
             } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(0..<children.count, id: \.self) { index in
-                        let childJson = children[index]
-                        let childStyle = childJson["style"] as? [String: Any] ?? [:]
-                        let childWeight = childStyle["weight"] as? Int ?? 0
-                        
-                        if childWeight > 0 {
-                            // If weight is specified, use flexible frame with weight as layout priority
-                            self.renderJSON(json: childJson)
-                                .frame(maxHeight: .infinity)
-                                .layoutPriority(Double(childWeight))
-                        } else {
-                            // Otherwise render normally
-                            self.renderJSON(json: childJson)
-                        }
+                // Handle "box" as a column layout (for compatibility)
+                VStack(alignment: alignment, spacing: 0) {
+                    ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
+                        self.renderChild(childJson: childJson, isHorizontal: false)
                     }
                 }
                 .padding(padding)
             }
         }
         .modifier(ViewStyleModifier(style: style))
+    }
+    
+    // Maps justifyContent values to SwiftUI horizontal alignment
+    private func mapJustifyContentToAlignment(_ justifyContent: String) -> HorizontalAlignment {
+        switch justifyContent.lowercased() {
+        case "start", "left":
+            return .leading
+        case "center":
+            return .center
+        case "end", "right":
+            return .trailing
+        case "top", "bottom":
+            // For vertical justification in horizontal layouts, default to leading
+            return .leading
+        default:
+            return .leading
+        }
+    }
+    
+    // Maps justifyContent values to SwiftUI vertical alignment
+    private func mapJustifyContentToVerticalAlignment(_ justifyContent: String) -> VerticalAlignment {
+        switch justifyContent.lowercased() {
+        case "start", "left", "right":
+            // For horizontal justification in vertical layouts, default to top
+            return .top
+        case "center":
+            return .center
+        case "end":
+            return .bottom
+        case "top":
+            return .top
+        case "bottom":
+            return .bottom
+        default:
+            return .top
+        }
     }
     
     /// Renders a text component
@@ -146,33 +200,59 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         // Fix for the field name typo in the example JSON
         let styleWithFallback = json["tyle"] as? [String: Any] ?? style
         let contentScale = styleWithFallback["contentScale"] as? String ?? "fit"
-        let width = styleWithFallback["width"] as? Int ?? 0
         
-        // Handle special case for width: -1 (match parent)
-        let frameWidth: CGFloat? = width == -1 ? .infinity : (width > 0 ? CGFloat(width) : nil)
+        // Support multiple width formats:
+        // 1. Direct integer width
+        // 2. Width as percentage string
+        // 3. Special case for width: -1 (match parent)
+        var frameWidth: CGFloat? = nil
         
-        if let url = URL(string: urlString) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                case .success(let image):
-                    image
-                        .resizable()
-                        .apply(contentScale: contentScale)
-                case .failure:
-                    Image(systemName: "photo")
-                        .foregroundColor(.gray)
-                @unknown default:
-                    EmptyView()
-                }
-            }
-            .modifier(ImageStyleModifier(style: styleWithFallback, frameWidth: frameWidth))
-        } else {
-            Image(systemName: "photo")
-                .foregroundColor(.gray)
-                .modifier(ImageStyleModifier(style: styleWithFallback, frameWidth: frameWidth))
+        if let width = styleWithFallback["width"] as? Int {
+            frameWidth = width == -1 ? .infinity : (width > 0 ? CGFloat(width) : nil)
+        } else if let widthPercentage = styleWithFallback["widthPercentage"] as? String,
+                  widthPercentage.hasSuffix("%"),
+                  let percentValue = Double(widthPercentage.dropLast()) {
+            // We'll handle percentage width with a modifier
+            frameWidth = nil
         }
+        
+        // Get height similarly
+        let height = styleWithFallback["height"] as? Int
+        let frameHeight: CGFloat? = height != nil ? CGFloat(height!) : nil
+        
+        let imageView = Group {
+            if let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .apply(contentScale: contentScale)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .foregroundColor(.gray)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                .frame(width: frameWidth, height: frameHeight)
+                .cornerRadius(CGFloat(styleWithFallback["borderRadius"] as? Int ?? 0))
+            } else {
+                Image(systemName: "photo")
+                    .foregroundColor(.gray)
+                    .frame(width: frameWidth, height: frameHeight)
+                    .cornerRadius(CGFloat(styleWithFallback["borderRadius"] as? Int ?? 0))
+            }
+        }
+        
+        return imageView
+            .padding(.leading, CGFloat(styleWithFallback["marginLeft"] as? Int ?? 0))
+            .padding(.trailing, CGFloat(styleWithFallback["marginRight"] as? Int ?? 0))
+            .padding(.top, CGFloat(styleWithFallback["marginTop"] as? Int ?? 0))
+            .padding(.bottom, CGFloat(styleWithFallback["marginBottom"] as? Int ?? 0))
+            .modifier(ImagePercentageModifier(style: styleWithFallback))
     }
     
     /// Renders a button component
@@ -201,6 +281,19 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
 }
 
 // MARK: - Style Modifiers
+
+/// Modifier for handling width percentage values
+@available(iOS 15.0, *)
+struct WidthPercentageModifier: ViewModifier {
+    let percentage: Double
+    
+    func body(content: Content) -> some View {
+        GeometryReader { geometry in
+            content
+                .frame(width: geometry.size.width * percentage / 100.0)
+        }
+    }
+}
 
 /// Style modifier for view components
 @available(iOS 15.0, *)
@@ -231,11 +324,32 @@ struct ViewStyleModifier: ViewModifier {
             var rgbValue: UInt64 = 0
             Scanner(string: String(hex)).scanHexInt64(&rgbValue)
             
-            let red = Double((rgbValue & 0xFF0000) >> 16) / 255.0
-            let green = Double((rgbValue & 0x00FF00) >> 8) / 255.0
-            let blue = Double(rgbValue & 0x0000FF) / 255.0
+            // Handle different hex formats (#RGB, #RRGGBB, #RRGGBBAA)
+            var red: Double = 0
+            var green: Double = 0
+            var blue: Double = 0
+            var alpha: Double = 1.0
             
-            return Color(red: red, green: green, blue: blue)
+            switch hex.count {
+            case 3: // #RGB
+                red = Double(((rgbValue & 0xF00) >> 8) * 17) / 255.0
+                green = Double(((rgbValue & 0x0F0) >> 4) * 17) / 255.0
+                blue = Double((rgbValue & 0x00F) * 17) / 255.0
+            case 6: // #RRGGBB
+                red = Double((rgbValue & 0xFF0000) >> 16) / 255.0
+                green = Double((rgbValue & 0x00FF00) >> 8) / 255.0
+                blue = Double(rgbValue & 0x0000FF) / 255.0
+            case 8: // #RRGGBBAA
+                red = Double((rgbValue & 0xFF000000) >> 24) / 255.0
+                green = Double((rgbValue & 0x00FF0000) >> 16) / 255.0
+                blue = Double((rgbValue & 0x0000FF00) >> 8) / 255.0
+                alpha = Double(rgbValue & 0x000000FF) / 255.0
+            default:
+                // Default to black if invalid format
+                return .black
+            }
+            
+            return Color(red: red, green: green, blue: blue, opacity: alpha)
         }
         
         // Handle named colors
@@ -315,23 +429,24 @@ struct TextStyleModifier: ViewModifier {
     }
 }
 
-/// Style modifier for image components
+/// Style modifier for image components with percentage-based width
 @available(iOS 15.0, *)
-struct ImageStyleModifier: ViewModifier {
+struct ImagePercentageModifier: ViewModifier {
     let style: [String: Any]
-    let frameWidth: CGFloat?
     
     func body(content: Content) -> some View {
-        content
-            .frame(
-                width: frameWidth,
-                height: style["height"] as? CGFloat ?? nil
-            )
-            .cornerRadius(CGFloat(style["borderRadius"] as? Int ?? 0))
-            .padding(.leading, CGFloat(style["marginLeft"] as? Int ?? 0))
-            .padding(.trailing, CGFloat(style["marginRight"] as? Int ?? 0))
-            .padding(.top, CGFloat(style["marginTop"] as? Int ?? 0))
-            .padding(.bottom, CGFloat(style["marginBottom"] as? Int ?? 0))
+        Group {
+            if let widthPercentage = style["widthPercentage"] as? String,
+               widthPercentage.hasSuffix("%"),
+               let percentValue = Double(widthPercentage.dropLast()) {
+                GeometryReader { geometry in
+                    content
+                        .frame(width: geometry.size.width * percentValue / 100.0)
+                }
+            } else {
+                content
+            }
+        }
     }
 }
 

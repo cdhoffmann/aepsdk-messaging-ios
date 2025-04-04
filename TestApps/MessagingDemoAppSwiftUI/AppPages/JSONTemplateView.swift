@@ -472,7 +472,7 @@ struct JSONTemplateView: View{
                     guard let propositions = retrievedPropositions?[self.cardsSurface] else { return }
                     for prop in propositions {
                         for item in prop.items {
-                            guard let jsonDict = item.jsonContentDictionary, let schemaData = self.createSchemaDataFromDictionary(jsonDict) else { return }
+                            guard let jsonDict = item.jsonContentDictionary, let schemaData = self.createSchemaDataFromDictionary(jsonDict) else { break }
                             if let template = JSONTemplate(schemaData) {
                                 self.savedCards.append(template)
                             }
