@@ -84,10 +84,23 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         
         if let percentStr = widthPercentage, percentStr.hasSuffix("%"),
            let percentValue = Double(percentStr.dropLast()) {
-            // Set width as a fraction of the container
-            renderJSON(json: childJson)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .modifier(WidthPercentageModifier(percentage: percentValue))
+            // For percentage-based widths, use a fixed size approach
+            let childType = childJson["type"] as? String ?? ""
+            let isImageContainer = childType == "image" || 
+                (childJson["children"] as? [Any])?.contains(where: { 
+                    ($0 as? [String: Any])?["type"] as? String == "image" 
+                }) ?? false
+            
+            // Special handling for image containers to ensure they're not cut off
+            if isImageContainer {
+                renderJSON(json: childJson)
+                    .frame(width: UIScreen.main.bounds.width * max(0.2, percentValue / 100.0))
+                    .frame(maxHeight: .infinity) // Fill the entire vertical space
+            } else {
+                renderJSON(json: childJson)
+                    .frame(maxWidth: .infinity)
+                    .layoutPriority(1.0)
+            }
         } else if childWeight > 0 {
             // If weight/flex is specified, use flexible frame with weight as layout priority
             if isHorizontal {
@@ -131,6 +144,7 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
                     }
                 }
                 .padding(padding)
+                .frame(maxHeight: .infinity) // Ensure row fills vertical space
             } else {
                 // Handle "box" as a column layout (for compatibility)
                 VStack(alignment: alignment, spacing: 0) {
@@ -141,6 +155,7 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
                 .padding(padding)
             }
         }
+        .frame(maxWidth: .infinity)
         .modifier(ViewStyleModifier(style: style))
     }
     
@@ -201,24 +216,18 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         let styleWithFallback = json["tyle"] as? [String: Any] ?? style
         let contentScale = styleWithFallback["contentScale"] as? String ?? "fit"
         
-        // Support multiple width formats:
-        // 1. Direct integer width
-        // 2. Width as percentage string
-        // 3. Special case for width: -1 (match parent)
+        // Support multiple width formats
         var frameWidth: CGFloat? = nil
         
         if let width = styleWithFallback["width"] as? Int {
             frameWidth = width == -1 ? .infinity : (width > 0 ? CGFloat(width) : nil)
-        } else if let widthPercentage = styleWithFallback["widthPercentage"] as? String,
-                  widthPercentage.hasSuffix("%"),
-                  let percentValue = Double(widthPercentage.dropLast()) {
-            // We'll handle percentage width with a modifier
-            frameWidth = nil
         }
         
         // Get height similarly
         let height = styleWithFallback["height"] as? Int
         let frameHeight: CGFloat? = height != nil ? CGFloat(height!) : nil
+        
+        let borderRadius = CGFloat(styleWithFallback["borderRadius"] as? Int ?? 0)
         
         let imageView = Group {
             if let url = URL(string: urlString) {
@@ -237,13 +246,16 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
                         EmptyView()
                     }
                 }
+                .scaledToFill() // Use scaledToFill instead of scaledToFit
                 .frame(width: frameWidth, height: frameHeight)
-                .cornerRadius(CGFloat(styleWithFallback["borderRadius"] as? Int ?? 0))
+                .frame(maxWidth: .infinity, maxHeight: .infinity) // Fill the entire space
+                .cornerRadius(borderRadius)
+                .clipped() // Ensure content stays within bounds
             } else {
                 Image(systemName: "photo")
                     .foregroundColor(.gray)
                     .frame(width: frameWidth, height: frameHeight)
-                    .cornerRadius(CGFloat(styleWithFallback["borderRadius"] as? Int ?? 0))
+                    .cornerRadius(borderRadius)
             }
         }
         
@@ -252,7 +264,6 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
             .padding(.trailing, CGFloat(styleWithFallback["marginRight"] as? Int ?? 0))
             .padding(.top, CGFloat(styleWithFallback["marginTop"] as? Int ?? 0))
             .padding(.bottom, CGFloat(styleWithFallback["marginBottom"] as? Int ?? 0))
-            .modifier(ImagePercentageModifier(style: styleWithFallback))
     }
     
     /// Renders a button component
@@ -301,16 +312,22 @@ struct ViewStyleModifier: ViewModifier {
     let style: [String: Any]
     
     func body(content: Content) -> some View {
+        let borderRadius = CGFloat(style["borderRadius"] as? Int ?? 0)
+        let borderWidth = CGFloat(style["borderWidth"] as? Int ?? 0)
+        let borderColor = parseColor(style["borderColor"]) ?? Color.clear
+        let backgroundColor = parseColor(style["backgroundColor"])
+        
         content
-            .background(parseColor(style["backgroundColor"]))
-            .cornerRadius(CGFloat(style["borderRadius"] as? Int ?? 0))
-            .overlay(
-                RoundedRectangle(cornerRadius: CGFloat(style["borderRadius"] as? Int ?? 0))
-                    .stroke(
-                        parseColor(style["borderColor"]) ?? Color.clear,
-                        lineWidth: CGFloat(style["borderWidth"] as? Int ?? 0)
+            // Apply background with border in a single step to ensure proper rendering
+            .background(
+                RoundedRectangle(cornerRadius: borderRadius)
+                    .fill(backgroundColor ?? Color.clear)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: borderRadius)
+                            .stroke(borderColor, lineWidth: borderWidth)
                     )
             )
+            // Don't clip content as it can cause issues
             .padding(.leading, CGFloat(style["marginLeft"] as? Int ?? 0))
             .padding(.trailing, CGFloat(style["marginRight"] as? Int ?? 0))
             .padding(.top, CGFloat(style["marginTop"] as? Int ?? 0))

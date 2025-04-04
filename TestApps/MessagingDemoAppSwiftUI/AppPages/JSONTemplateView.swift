@@ -396,8 +396,8 @@ struct JSONTemplateView: View{
                                         ForEach(savedCards) { card in
                                             card.view
                                                 .background(Color.white)
-                                                .cornerRadius(12)
-                                                .shadow(radius: 5)
+//                                                .cornerRadius(12)
+//                                                .shadow(radius: 5)
                                                 .padding(.horizontal)
                                         }
                                     }
@@ -407,9 +407,9 @@ struct JSONTemplateView: View{
                                        let template = JSONTemplate(schemaData) {
                                         template.view
                                             .background(Color.white)
-                                            .cornerRadius(12)
-                                            .shadow(radius: 5)
-                                            .padding(.horizontal)
+//                                            .cornerRadius(12)
+//                                            .shadow(radius: 5)
+//                                            .padding(.horizontal)
                                     } else {
                                         Text("Error creating template")
                                             .foregroundColor(.red)
