@@ -93,9 +93,10 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
             
             // Special handling for image containers to ensure they're not cut off
             if isImageContainer {
+                // Use a standard frame approach to avoid GeometryReader issues
                 renderJSON(json: childJson)
                     .frame(width: UIScreen.main.bounds.width * max(0.2, percentValue / 100.0))
-                    .frame(maxHeight: .infinity) // Fill the entire vertical space
+                    .clipShape(Rectangle()) // Ensure content stays within bounds
             } else {
                 renderJSON(json: childJson)
                     .frame(maxWidth: .infinity)
@@ -138,13 +139,13 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         // Create container based on flex direction
         Group {
             if flexDirection == "row" {
-                HStack(alignment: verticalAlignment, spacing: 0) {
+                HStack(alignment: .center, spacing: 0) {
                     ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
                         self.renderChild(childJson: childJson, isHorizontal: true)
                     }
                 }
                 .padding(padding)
-                .frame(maxHeight: .infinity) // Ensure row fills vertical space
+                // Don't force a specific height - let content determine it
             } else {
                 // Handle "box" as a column layout (for compatibility)
                 VStack(alignment: alignment, spacing: 0) {
@@ -155,7 +156,9 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
                 .padding(padding)
             }
         }
+        // Ensure the view expands to its parent's width
         .frame(maxWidth: .infinity)
+        // Apply the style modifier which handles background, border, etc.
         .modifier(ViewStyleModifier(style: style))
     }
     
@@ -215,55 +218,86 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         // Fix for the field name typo in the example JSON
         let styleWithFallback = json["tyle"] as? [String: Any] ?? style
         let contentScale = styleWithFallback["contentScale"] as? String ?? "fit"
-        
-        // Support multiple width formats
-        var frameWidth: CGFloat? = nil
-        
-        if let width = styleWithFallback["width"] as? Int {
-            frameWidth = width == -1 ? .infinity : (width > 0 ? CGFloat(width) : nil)
-        }
-        
-        // Get height similarly
-        let height = styleWithFallback["height"] as? Int
-        let frameHeight: CGFloat? = height != nil ? CGFloat(height!) : nil
-        
         let borderRadius = CGFloat(styleWithFallback["borderRadius"] as? Int ?? 0)
         
-        let imageView = Group {
-            if let url = URL(string: urlString) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .apply(contentScale: contentScale)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        EmptyView()
-                    }
+        // Get margin values
+        let marginLeft = CGFloat(styleWithFallback["marginLeft"] as? Int ?? 0)
+        let marginRight = CGFloat(styleWithFallback["marginRight"] as? Int ?? 0)
+        let marginTop = CGFloat(styleWithFallback["marginTop"] as? Int ?? 0)
+        let marginBottom = CGFloat(styleWithFallback["marginBottom"] as? Int ?? 0)
+        
+        // Create the image view based on URL
+        imageViewForURL(
+            urlString: urlString,
+            contentScale: contentScale,
+            borderRadius: borderRadius,
+            style: styleWithFallback
+        )
+        .padding(.leading, marginLeft)
+        .padding(.trailing, marginRight)
+        .padding(.top, marginTop)
+        .padding(.bottom, marginBottom)
+    }
+    
+    // Helper method to create an image view from a URL
+    @ViewBuilder
+    private func imageViewForURL(urlString: String, contentScale: String, borderRadius: CGFloat, style: [String: Any]) -> some View {
+        // Calculate dimensions - use more compact height by default
+        let width: CGFloat? = calculateWidth(style: style)
+        let height: CGFloat = calculateHeight(style: style)
+        
+        if let url = URL(string: urlString) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                        .frame(width: width, height: height)
+                case .success(let image):
+                    image
+                        .resizable()
+                        .apply(contentScale: contentScale)
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: width, height: height)
+                        .cornerRadius(borderRadius)
+                        .clipped()
+                case .failure:
+                    Image(systemName: "photo")
+                        .foregroundColor(.gray)
+                        .frame(width: width, height: height)
+                @unknown default:
+                    EmptyView()
                 }
-                .scaledToFill() // Use scaledToFill instead of scaledToFit
-                .frame(width: frameWidth, height: frameHeight)
-                .frame(maxWidth: .infinity, maxHeight: .infinity) // Fill the entire space
+            }
+        } else {
+            Image(systemName: "photo")
+                .foregroundColor(.gray)
+                .frame(width: width, height: height)
                 .cornerRadius(borderRadius)
-                .clipped() // Ensure content stays within bounds
-            } else {
-                Image(systemName: "photo")
-                    .foregroundColor(.gray)
-                    .frame(width: frameWidth, height: frameHeight)
-                    .cornerRadius(borderRadius)
+        }
+    }
+    
+    // Helper method to calculate width
+    private func calculateWidth(style: [String: Any]) -> CGFloat? {
+        if let width = style["width"] as? Int {
+            if width == -1 {
+                return .infinity
+            } else if width > 0 {
+                return CGFloat(width)
             }
         }
-        
-        return imageView
-            .padding(.leading, CGFloat(styleWithFallback["marginLeft"] as? Int ?? 0))
-            .padding(.trailing, CGFloat(styleWithFallback["marginRight"] as? Int ?? 0))
-            .padding(.top, CGFloat(styleWithFallback["marginTop"] as? Int ?? 0))
-            .padding(.bottom, CGFloat(styleWithFallback["marginBottom"] as? Int ?? 0))
+        return nil
+    }
+    
+    // Helper method to calculate height
+    private func calculateHeight(style: [String: Any]) -> CGFloat {
+        if let height = style["height"] as? Int {
+            if height == -1 {
+                return .infinity
+            } else if height > 0 {
+                return CGFloat(height)
+            }
+        }
+        return 80 // Use a more compact default height for better card proportions
     }
     
     /// Renders a button component
@@ -318,16 +352,18 @@ struct ViewStyleModifier: ViewModifier {
         let backgroundColor = parseColor(style["backgroundColor"])
         
         content
-            // Apply background with border in a single step to ensure proper rendering
+            // First apply a mask to clip the content
+            .clipShape(RoundedRectangle(cornerRadius: borderRadius))
+            // Then apply background and border
             .background(
                 RoundedRectangle(cornerRadius: borderRadius)
                     .fill(backgroundColor ?? Color.clear)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: borderRadius)
-                            .stroke(borderColor, lineWidth: borderWidth)
-                    )
             )
-            // Don't clip content as it can cause issues
+            // Apply border as the outermost layer
+            .overlay(
+                RoundedRectangle(cornerRadius: borderRadius)
+                    .stroke(borderColor, lineWidth: borderWidth)
+            )
             .padding(.leading, CGFloat(style["marginLeft"] as? Int ?? 0))
             .padding(.trailing, CGFloat(style["marginRight"] as? Int ?? 0))
             .padding(.top, CGFloat(style["marginTop"] as? Int ?? 0))
