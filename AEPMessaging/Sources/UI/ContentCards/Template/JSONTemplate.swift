@@ -20,7 +20,7 @@ import Foundation
 
 /// A template that renders content cards based on a flexible JSON format
 @available(iOS 15.0, *)
-public class JSONTemplate: BaseTemplate, ContentCardTemplate {
+public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
     
     // MARK: - Properties
     public var templateType: ContentCardTemplateType = .jsonTemplate
