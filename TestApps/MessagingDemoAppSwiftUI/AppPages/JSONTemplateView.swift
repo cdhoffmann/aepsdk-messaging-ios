@@ -151,6 +151,10 @@ struct JSONTemplateView: View{
     }
     """
     
+    private let fromUIJSON = """
+{"type":"view","style":{"display":"flex","flexDirection":"row","alignItems":"center","padding":16,"backgroundColor":"white"},"children":[{"type":"view","style":{"display":"flex","flexDirection":"column","marginLeft":16,"flex":1},"children":[{"type":"text","style":{"fontSize":14,"fontWeight":"bold"},"content":"Escape to Paradise!"},{"type":"text","style":{"fontSize":12},"content":"Exclusive Vacation Deals Await You"},{"type":"text","style":{"fontSize":12},"content":"Unwind with our limited-time vacation offers. Book now!"}]},{"type":"image","style":{"height":60,"width":60},"url":"https://va7stagevarysstorage.blob.core.windows.net/content-generated/dbdda16d-5cb5-495b-aaca-bbeae33da2e9/firefly/ca7650cb-7204-416d-86d9-34ff820a2be2.jpeg?st=2025-04-04T18%3A59%3A16Z&se=2025-05-04T18%3A59%3A16Z&sp=r&sv=2023-01-03&sr=b&sig=C3T5gwdJ//7X/zWC9tfgzY7MbDPZXrjwiJxWWDgZ2I8%3D"}]}
+"""
+    
     // Create a mock ContentCardSchemaData instance from a JSON string
     private func createMockSchemaData(jsonString: String) -> ContentCardSchemaData? {
         guard let jsonData = jsonString.data(using: .utf8),
@@ -195,12 +199,12 @@ struct JSONTemplateView: View{
                 VStack(alignment: .leading, spacing: 12) {
                     Picker("Example", selection: $selectedExample) {
                         Text("Large Image").tag(0)
-                        Text("Server Cards").tag(1)
-                        Text("Image Only").tag(2)
+                        Text("UI example").tag(1)
+                        Text("From AJO").tag(2)
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     
-                    if selectedExample == 1 {
+                    if selectedExample == 2 {
                         HStack {
                             Button("Download Cards") {
                                 downloadCards()
@@ -232,6 +236,17 @@ struct JSONTemplateView: View{
                                         .foregroundColor(.red)
                                 }
                             case 1:
+                                // Weight and borders example (static)
+                                if let schemaData = createMockSchemaData(jsonString: fromUIJSON),
+                                   let template = JSONTemplate(schemaData) {
+                                    template.view
+                                        .background(Color.white)
+                                        .padding(.horizontal)
+                                } else {
+                                    Text("Error creating template")
+                                        .foregroundColor(.red)
+                                }
+                            case 2:
                                 // Server propositions (dynamic)
                                 if savedCards.isEmpty {
                                     Text("No cards available. Tap 'Download Cards' to get content cards from the server.")
@@ -244,17 +259,6 @@ struct JSONTemplateView: View{
                                             .background(Color.white)
                                             .padding(.horizontal)
                                     }
-                                }
-                            case 2:
-                                // Weight and borders example (static)
-                                if let schemaData = createMockSchemaData(jsonString: imageOnlyJSON),
-                                   let template = JSONTemplate(schemaData) {
-                                    template.view
-                                        .background(Color.white)
-                                        .padding(.horizontal)
-                                } else {
-                                    Text("Error creating template")
-                                        .foregroundColor(.red)
                                 }
                             default:
                                 Text("Select an example")

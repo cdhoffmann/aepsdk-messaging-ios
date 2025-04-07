@@ -85,17 +85,33 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         
         switch flexDirection {
         case "row":
-            HStack(alignment: getVerticalAlignment(style)) {
+            HStack(alignment: getVerticalAlignment(style), spacing: 8) {
                 ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
                     let childStyle = childJson["style"] as? [String: Any] ?? [:]
                     let childModifier = self.createChildModifier(style: childStyle, isHorizontal: true)
-                    self.renderJSONComponent(json: childJson, modifier: childModifier)
+                    let childType = childJson["type"] as? String ?? ""
+                    
+                    // For text components, allow them to take their natural space
+                    if childType.lowercased() == "text" {
+                        self.renderJSONComponent(json: childJson, modifier: childModifier)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .layoutPriority(1)
+                    }
+                    // For image components with explicit dimensions, ensure they stay fixed
+                    else if childType.lowercased() == "image" && childStyle["width"] != nil {
+                        self.renderJSONComponent(json: childJson, modifier: childModifier)
+                            .fixedSize(horizontal: true, vertical: true)
+                    }
+                    // For other components, render normally
+                    else {
+                        self.renderJSONComponent(json: childJson, modifier: childModifier)
+                    }
                 }
             }
             .applyModifier(modifier)
             
         case "column":
-            VStack(alignment: getHorizontalAlignment(style)) {
+            VStack(alignment: getHorizontalAlignment(style), spacing: 4) {
                 ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
                     let childStyle = childJson["style"] as? [String: Any] ?? [:]
                     let childModifier = self.createChildModifier(style: childStyle, isHorizontal: false)
@@ -136,31 +152,95 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         let urlString = json["url"] as? String ?? ""
         let style = json["style"] as? [String: Any] ?? [:]
         
-        if let url = URL(string: urlString) {
-            ZStack(alignment: .center) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                    case .success(let image):
+        // Extract explicit dimensions from style
+        let widthValue = style["width"] as? Int
+        let heightValue = style["height"] as? Int
+        let fillWidth = style["fillWidth"] as? Bool ?? false
+        
+        // Calculate frame sizes for direct application
+        let frameWidth: CGFloat? = widthValue != nil ? CGFloat(widthValue!) : (fillWidth ? .infinity : nil)
+        let frameHeight: CGFloat? = heightValue != nil ? CGFloat(heightValue!) : nil
+        
+        let hasExplicitDimensions = widthValue != nil && heightValue != nil
+        
+        Group {
+            if let url = URL(string: urlString) {
+                renderImageWithURL(url, style: style, frameWidth: frameWidth, frameHeight: frameHeight, modifier: modifier)
+            } else {
+                renderPlaceholderImage(frameWidth: frameWidth, frameHeight: frameHeight, modifier: modifier)
+            }
+        }
+        .if(hasExplicitDimensions) { $0.fixedSize(horizontal: true, vertical: true) }
+    }
+    
+    /// Helper method to render an image from a URL
+    @ViewBuilder
+    private func renderImageWithURL(_ url: URL, style: [String: Any], frameWidth: CGFloat?, frameHeight: CGFloat?, modifier: Modifier) -> some View {
+        let hasExplicitDimensions = frameWidth != nil && frameHeight != nil && frameWidth != .infinity && frameHeight != .infinity
+        
+        // Create a container to properly constrain the image
+        VStack(spacing: 0) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                case .success(let image):
+                    if hasExplicitDimensions {
+                        // When exact dimensions are provided, fill the space completely
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: frameWidth, height: frameHeight)
+                            .clipped()
+                    } else {
+                        // Otherwise use standard content scale and aspect ratio
                         image
                             .resizable()
                             .applyContentScale(style: style)
                             .applyAspectRatio(style: style)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        EmptyView()
+                            .frame(width: frameWidth, height: frameHeight)
                     }
+                case .failure:
+                    Image(systemName: "photo")
+                        .foregroundColor(.gray)
+                        .frame(width: frameWidth, height: frameHeight)
+                @unknown default:
+                    EmptyView()
                 }
             }
-            .applyModifier(modifier)
-        } else {
-            Image(systemName: "photo")
-                .foregroundColor(.gray)
-                .applyModifier(modifier)
         }
+        .frame(width: frameWidth, height: frameHeight, alignment: .center)
+        .background(modifier.background?.color)
+        .applyBorderStyle(modifier.border)
+        .applyPaddingAndMargin(padding: modifier.padding, margin: modifier.margin)
+    }
+    
+    /// Helper method to render a placeholder image
+    @ViewBuilder
+    private func renderPlaceholderImage(frameWidth: CGFloat?, frameHeight: CGFloat?, modifier: Modifier) -> some View {
+        let hasExplicitDimensions = frameWidth != nil && frameHeight != nil && frameWidth != .infinity && frameHeight != .infinity
+        
+        // Create a container to properly constrain the placeholder
+        VStack(spacing: 0) {
+            if hasExplicitDimensions {
+                // When exact dimensions are provided, fill the space
+                Image(systemName: "photo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .foregroundColor(.gray)
+                    .frame(width: frameWidth, height: frameHeight)
+                    .clipped()
+            } else {
+                // Standard placeholder
+                Image(systemName: "photo")
+                    .foregroundColor(.gray)
+                    .frame(width: frameWidth, height: frameHeight)
+            }
+        }
+        .frame(width: frameWidth, height: frameHeight, alignment: .center)
+        .background(modifier.background?.color)
+        .applyBorderStyle(modifier.border)
+        .applyPaddingAndMargin(padding: modifier.padding, margin: modifier.margin)
     }
     
     /// Renders a button component
@@ -425,12 +505,19 @@ struct Modifier {
     func apply(style: [String: Any]) -> Modifier {
         var newModifier = self
         
-        // Apply frame modifiers
+        // Preserve existing explicit dimensions if the current modifier already has them
+        let existingWidth = self.frame?.width
+        let existingHeight = self.frame?.height
+        
+        // Apply frame modifiers - use existing dimensions if they're not null and not in the new style
+        let styleWidth = style["width"] as? Int
+        let styleHeight = style["height"] as? Int
+        
         newModifier.frame = FrameModifier(
-            width: style["width"] as? Int,
-            height: style["height"] as? Int,
-            fillWidth: style["fillWidth"] as? Bool ?? false,
-            fillHeight: style["fillHeight"] as? Bool ?? false
+            width: styleWidth ?? existingWidth,
+            height: styleHeight ?? existingHeight,
+            fillWidth: style["fillWidth"] as? Bool ?? (self.frame?.fillWidth ?? false),
+            fillHeight: style["fillHeight"] as? Bool ?? (self.frame?.fillHeight ?? false)
         )
         
         // Apply padding modifiers
@@ -556,18 +643,27 @@ extension View {
             // Apply frame
             .then { view in
                 if let frame = modifier.frame {
-                    if frame.fillWidth && frame.fillHeight {
+                    // If explicit width and height are provided, they take precedence
+                    if let width = frame.width, let height = frame.height {
+                        return AnyView(view.frame(width: CGFloat(width), height: CGFloat(height)))
+                    } else if let width = frame.width {
+                        if frame.fillHeight {
+                            return AnyView(view.frame(minWidth: CGFloat(width), maxHeight: .infinity))
+                        } else {
+                            return AnyView(view.frame(width: CGFloat(width)))
+                        }
+                    } else if let height = frame.height {
+                        if frame.fillWidth {
+                            return AnyView(view.frame(maxWidth: .infinity, minHeight: CGFloat(height)))
+                        } else {
+                            return AnyView(view.frame(height: CGFloat(height)))
+                        }
+                    } else if frame.fillWidth && frame.fillHeight {
                         return AnyView(view.frame(maxWidth: .infinity, maxHeight: .infinity))
                     } else if frame.fillWidth {
                         return AnyView(view.frame(maxWidth: .infinity))
                     } else if frame.fillHeight {
                         return AnyView(view.frame(maxHeight: .infinity))
-                    } else if let width = frame.width, let height = frame.height {
-                        return AnyView(view.frame(width: CGFloat(width), height: CGFloat(height)))
-                    } else if let width = frame.width {
-                        return AnyView(view.frame(width: CGFloat(width)))
-                    } else if let height = frame.height {
-                        return AnyView(view.frame(height: CGFloat(height)))
                     }
                 }
                 return AnyView(view)
@@ -681,6 +777,83 @@ extension View {
             } else {
                 self
             }
+        } else {
+            self
+        }
+    }
+    
+    /// Applies border and corner radius styling
+    @ViewBuilder
+    func applyBorderStyle(_ border: BorderModifier?) -> some View {
+        if let border = border {
+            if border.width > 0 {
+                let shape = RoundedRectangle(cornerRadius: border.radius)
+                self.overlay(shape.strokeBorder(border.color, lineWidth: border.width))
+                    .clipShape(shape)
+            } else if border.radius > 0 {
+                self.clipShape(RoundedRectangle(cornerRadius: border.radius))
+            } else {
+                self
+            }
+        } else {
+            self
+        }
+    }
+    
+    /// Applies padding and margin in one go
+    @ViewBuilder
+    func applyPaddingAndMargin(padding: PaddingModifier?, margin: MarginModifier?) -> some View {
+        self.padding(calculateEdgeInsets(from: padding))
+            .padding(calculateEdgeInsets(from: margin))
+    }
+    
+    /// Calculates EdgeInsets from a PaddingModifier
+    private func calculateEdgeInsets(from padding: PaddingModifier?) -> EdgeInsets {
+        guard let padding = padding else { return EdgeInsets() }
+        
+        if let all = padding.all {
+            return EdgeInsets(top: CGFloat(all), leading: CGFloat(all), bottom: CGFloat(all), trailing: CGFloat(all))
+        }
+        
+        var edgeInsets = EdgeInsets()
+        if let vertical = padding.vertical {
+            edgeInsets.top = CGFloat(vertical)
+            edgeInsets.bottom = CGFloat(vertical)
+        }
+        if let horizontal = padding.horizontal {
+            edgeInsets.leading = CGFloat(horizontal)
+            edgeInsets.trailing = CGFloat(horizontal)
+        }
+        
+        return edgeInsets
+    }
+    
+    /// Calculates EdgeInsets from a MarginModifier
+    private func calculateEdgeInsets(from margin: MarginModifier?) -> EdgeInsets {
+        guard let margin = margin else { return EdgeInsets() }
+        
+        var edgeInsets = EdgeInsets()
+        if let left = margin.left {
+            edgeInsets.leading = CGFloat(left)
+        }
+        if let right = margin.right {
+            edgeInsets.trailing = CGFloat(right)
+        }
+        if let top = margin.top {
+            edgeInsets.top = CGFloat(top)
+        }
+        if let bottom = margin.bottom {
+            edgeInsets.bottom = CGFloat(bottom)
+        }
+        
+        return edgeInsets
+    }
+    
+    // Helper for conditional modifiers
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
         } else {
             self
         }
