@@ -75,47 +75,53 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
     @ViewBuilder
     private func renderChild(childJson: [String: Any], isHorizontal: Bool) -> some View {
         let childStyle = childJson["style"] as? [String: Any] ?? [:]
+        let childType = childJson["type"] as? String ?? ""
         
         // Support both "weight" (original) and "flex" (new format)
         let childWeight = childStyle["flex"] as? Int ?? childStyle["weight"] as? Int ?? 0
         
-        // Support "widthPercentage" as a string percentage
-        let widthPercentage = childStyle["widthPercentage"] as? String
+        // Check for fillWidth/fillHeight
+        let fillWidth = childStyle["fillWidth"] as? Bool == true
+        let fillHeight = childStyle["fillHeight"] as? Bool == true
         
-        if let percentStr = widthPercentage, percentStr.hasSuffix("%"),
-           let percentValue = Double(percentStr.dropLast()) {
-            // For percentage-based widths, use a fixed size approach
-            let childType = childJson["type"] as? String ?? ""
-            let isImageContainer = childType == "image" || 
-                (childJson["children"] as? [Any])?.contains(where: { 
-                    ($0 as? [String: Any])?["type"] as? String == "image" 
-                }) ?? false
-            
-            // Special handling for image containers to ensure they're not cut off
-            if isImageContainer {
-                // Use a standard frame approach to avoid GeometryReader issues
-                renderJSON(json: childJson)
-                    .frame(width: UIScreen.main.bounds.width * max(0.2, percentValue / 100.0))
-                    .clipShape(Rectangle()) // Ensure content stays within bounds
-            } else {
-                renderJSON(json: childJson)
-                    .frame(maxWidth: .infinity)
-                    .layoutPriority(1.0)
-            }
-        } else if childWeight > 0 {
-            // If weight/flex is specified, use flexible frame with weight as layout priority
+        // First render the base view
+        let renderedView = renderJSON(json: childJson)
+        
+        // Then apply the layout constraints based on style properties
+        Group {
             if isHorizontal {
-                renderJSON(json: childJson)
-                    .frame(maxWidth: .infinity)
-                    .layoutPriority(Double(childWeight))
+                if childWeight > 0 {
+                    // Use flex/weight for horizontal layouts
+                    renderedView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .layoutPriority(Double(childWeight))
+                } else if fillWidth {
+                    // Fill width in horizontal container
+                    renderedView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // Default rendering for horizontal layouts
+                    renderedView
+                }
             } else {
-                renderJSON(json: childJson)
-                    .frame(maxHeight: .infinity)
-                    .layoutPriority(Double(childWeight))
+                if childWeight > 0 {
+                    // Use flex/weight for vertical layouts
+                    renderedView
+                        .frame(maxWidth: .infinity)
+                        .layoutPriority(Double(childWeight))
+                } else if fillWidth {
+                    // For full-width components in vertical layouts
+                    renderedView
+                        .frame(maxWidth: .infinity)
+                } else if childType == "image" {
+                    // Special handling for images in vertical layouts
+                    renderedView
+                } else {
+                    // Default rendering for vertical layouts
+                    renderedView
+                        .frame(maxWidth: .infinity)
+                }
             }
-        } else {
-            // Otherwise render normally
-            renderJSON(json: childJson)
         }
     }
     
@@ -132,6 +138,9 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         let padding = CGFloat(style["padding"] as? Int ?? 0)
         let justifyContent = style["justifyContent"] as? String ?? "start"
         
+        // Get spacing between items (default to 0)
+        let spacing = CGFloat(style["spacing"] as? Int ?? 0)
+        
         // Map justifyContent value to SwiftUI alignment
         let alignment: HorizontalAlignment = mapJustifyContentToAlignment(justifyContent)
         let verticalAlignment: VerticalAlignment = mapJustifyContentToVerticalAlignment(justifyContent)
@@ -139,16 +148,15 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         // Create container based on flex direction
         Group {
             if flexDirection == "row" {
-                HStack(alignment: .center, spacing: 0) {
+                HStack(alignment: .center, spacing: spacing) {
                     ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
                         self.renderChild(childJson: childJson, isHorizontal: true)
                     }
                 }
                 .padding(padding)
-                // Don't force a specific height - let content determine it
             } else {
                 // Handle "box" as a column layout (for compatibility)
-                VStack(alignment: alignment, spacing: 0) {
+                VStack(alignment: alignment, spacing: spacing) {
                     ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
                         self.renderChild(childJson: childJson, isHorizontal: false)
                     }
@@ -156,9 +164,7 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
                 .padding(padding)
             }
         }
-        // Ensure the view expands to its parent's width
         .frame(maxWidth: .infinity)
-        // Apply the style modifier which handles background, border, etc.
         .modifier(ViewStyleModifier(style: style))
     }
     
@@ -226,58 +232,87 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
         let marginTop = CGFloat(styleWithFallback["marginTop"] as? Int ?? 0)
         let marginBottom = CGFloat(styleWithFallback["marginBottom"] as? Int ?? 0)
         
-        // Create the image view based on URL
-        imageViewForURL(
-            urlString: urlString,
-            contentScale: contentScale,
-            borderRadius: borderRadius,
-            style: styleWithFallback
-        )
-        .padding(.leading, marginLeft)
-        .padding(.trailing, marginRight)
-        .padding(.top, marginTop)
-        .padding(.bottom, marginBottom)
-    }
-    
-    // Helper method to create an image view from a URL
-    @ViewBuilder
-    private func imageViewForURL(urlString: String, contentScale: String, borderRadius: CGFloat, style: [String: Any]) -> some View {
-        // Calculate dimensions - use more compact height by default
-        let width: CGFloat? = calculateWidth(style: style)
-        let height: CGFloat = calculateHeight(style: style)
+        // Extract key properties
+        let shouldFillWidth = styleWithFallback["fillWidth"] as? Bool == true
+        let aspectRatioStr = styleWithFallback["aspectRatio"] as? String
+        let aspectRatio = aspectRatioStr.flatMap(parseAspectRatio)
         
+        // Simple direct approach for image rendering
         if let url = URL(string: urlString) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                        .frame(width: width, height: height)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .apply(contentScale: contentScale)
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: width, height: height)
-                        .cornerRadius(borderRadius)
-                        .clipped()
-                case .failure:
-                    Image(systemName: "photo")
-                        .foregroundColor(.gray)
-                        .frame(width: width, height: height)
-                @unknown default:
-                    EmptyView()
+            // Use a ZStack for proper clipping and positioning
+            ZStack {
+                // Use GeometryReader only when needed for aspect ratio calculations
+                if aspectRatio != nil || shouldFillWidth {
+                    GeometryReader { geometry in
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .apply(contentScale: contentScale)
+                                    .aspectRatio(aspectRatio, contentMode: self.contentScaleToAspectRatioMode(contentScale))
+                                    .frame(width: shouldFillWidth ? geometry.size.width : nil, 
+                                           height: aspectRatio != nil ? geometry.size.width / aspectRatio! : nil)
+                            case .failure:
+                                Image(systemName: "photo")
+                                    .foregroundColor(.gray)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                    }
+                    // Set minimum height for aspect ratio images
+                    .frame(minHeight: aspectRatio != nil ? 150 : nil)
+                } else {
+                    // Simpler rendering for basic images
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .apply(contentScale: contentScale)
+                        case .failure:
+                            Image(systemName: "photo")
+                                .foregroundColor(.gray)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                    .frame(height: 120) // Default height for basic images
                 }
             }
+            .cornerRadius(borderRadius)
+            .clipped()
+            .frame(maxWidth: shouldFillWidth ? .infinity : nil)
+            .padding(.leading, marginLeft)
+            .padding(.trailing, marginRight)
+            .padding(.top, marginTop)
+            .padding(.bottom, marginBottom)
         } else {
+            // Placeholder for invalid URL
             Image(systemName: "photo")
                 .foregroundColor(.gray)
-                .frame(width: width, height: height)
+                .frame(height: 120)
                 .cornerRadius(borderRadius)
+                .padding(.leading, marginLeft)
+                .padding(.trailing, marginRight)
+                .padding(.top, marginTop)
+                .padding(.bottom, marginBottom)
         }
     }
     
     // Helper method to calculate width
     private func calculateWidth(style: [String: Any]) -> CGFloat? {
+        // Check for fillWidth first - if true, return .infinity to fill container
+        if let fillWidth = style["fillWidth"] as? Bool, fillWidth {
+            return .infinity
+        }
+        
+        // If fillWidth is false or not specified, check for explicit width
         if let width = style["width"] as? Int {
             if width == -1 {
                 return .infinity
@@ -285,11 +320,18 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
                 return CGFloat(width)
             }
         }
+        
         return nil
     }
     
     // Helper method to calculate height
     private func calculateHeight(style: [String: Any]) -> CGFloat {
+        // Check for fillHeight first - if true, return .infinity to fill container
+        if let fillHeight = style["fillHeight"] as? Bool, fillHeight {
+            return .infinity
+        }
+        
+        // If fillHeight is false or not specified, check for explicit height
         if let height = style["height"] as? Int {
             if height == -1 {
                 return .infinity
@@ -297,7 +339,47 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
                 return CGFloat(height)
             }
         }
-        return 80 // Use a more compact default height for better card proportions
+        
+        // If aspectRatio is specified and fillWidth is true, calculate height based on aspect ratio
+        if let aspectRatioStr = style["aspectRatio"] as? String,
+           let fillWidth = style["fillWidth"] as? Bool, fillWidth {
+            if let aspectRatio = parseAspectRatio(aspectRatioStr) {
+                // When using with fillWidth, we'll calculate the actual height in the view
+                // Return a placeholder value for now
+                return 0 // Placeholder - will be calculated based on container width
+            }
+        }
+        
+        return 80 // Default height if nothing else is specified
+    }
+    
+    // Parse aspectRatio from string format like "100/300"
+    private func parseAspectRatio(_ aspectRatioStr: String) -> CGFloat? {
+        let components = aspectRatioStr.components(separatedBy: "/")
+        if components.count == 2,
+           let width = Double(components[0]),
+           let height = Double(components[1]),
+           width > 0, height > 0 {
+            // Aspect ratio should be calculated as width divided by height
+            // For "300/100", this gives us 3.0, meaning the width is 3x the height
+            return CGFloat(width / height)
+        }
+        return nil
+    }
+    
+    // Convert content scale string to SwiftUI AspectRatio.ContentMode
+    private func contentScaleToAspectRatioMode(_ contentScale: String) -> ContentMode {
+        switch contentScale.lowercased() {
+        case "fill":
+            return .fill
+        case "fit", "none":
+            return .fit
+        case "crop":
+            // For crop, we use fill and rely on .clipped() to crop it
+            return .fill
+        default:
+            return .fit
+        }
     }
     
     /// Renders a button component
@@ -351,19 +433,23 @@ struct ViewStyleModifier: ViewModifier {
         let borderColor = parseColor(style["borderColor"]) ?? Color.clear
         let backgroundColor = parseColor(style["backgroundColor"])
         
+        // Apply styles in the correct order for proper rendering
         content
-            // First apply a mask to clip the content
-            .clipShape(RoundedRectangle(cornerRadius: borderRadius))
-            // Then apply background and border
+            // First reset any default spacing or padding that might interfere
+            .padding(0)
+            // Apply background first
             .background(
                 RoundedRectangle(cornerRadius: borderRadius)
                     .fill(backgroundColor ?? Color.clear)
             )
-            // Apply border as the outermost layer
+            // Then apply clipping so content doesn't overflow the border radius
+            .clipShape(RoundedRectangle(cornerRadius: borderRadius))
+            // Apply border as an overlay for better control
             .overlay(
                 RoundedRectangle(cornerRadius: borderRadius)
-                    .stroke(borderColor, lineWidth: borderWidth)
+                    .strokeBorder(borderColor, lineWidth: borderWidth)
             )
+            // External margins are applied last
             .padding(.leading, CGFloat(style["marginLeft"] as? Int ?? 0))
             .padding(.trailing, CGFloat(style["marginRight"] as? Int ?? 0))
             .padding(.top, CGFloat(style["marginTop"] as? Int ?? 0))
@@ -613,6 +699,19 @@ extension View {
             self
         default:
             self.scaledToFit() // Default to fit
+        }
+    }
+    
+    /// Applies a modifier conditionally
+    @ViewBuilder
+    func `if`<Content: View>(
+        _ condition: Bool,
+        transform: (Self) -> Content
+    ) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
         }
     }
 } 

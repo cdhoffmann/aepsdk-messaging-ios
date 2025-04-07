@@ -38,7 +38,8 @@ struct JSONTemplateView: View{
         {
           "type": "image",
           "style": {
-            "widthPercentage": "100%",
+            "fillWidth": true,
+            "aspectRatio": "300/100",
             "borderRadius": 8,
             "contentScale": "crop"
           },
@@ -128,7 +129,7 @@ struct JSONTemplateView: View{
         {
           "type": "image",
           "style": {
-            "widthPercentage": "100%",
+            "fillWidth": true,
             "borderRadius": 8,
             "contentScale": "crop"
           },
