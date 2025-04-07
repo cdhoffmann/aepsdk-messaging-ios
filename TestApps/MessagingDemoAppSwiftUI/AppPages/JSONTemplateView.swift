@@ -17,7 +17,7 @@ import SwiftUI
 @available(iOS 15.0, *)
 struct JSONTemplateView: View{
     let cardsSurface = Surface(path: Constants.SurfaceName.CONTENT_CARD)
-    @State private var showCard = false
+    @State private var showCard = true
     @State private var selectedExample = 0
     @State private var savedCards: [JSONTemplate] = []
     @State private var showLoadingIndicator: Bool = false
@@ -193,26 +193,21 @@ struct JSONTemplateView: View{
                 
                 // Toggles and controls
                 VStack(alignment: .leading, spacing: 12) {
-                    Toggle("Show Content Card", isOn: $showCard)
+                    Picker("Example", selection: $selectedExample) {
+                        Text("Large Image").tag(0)
+                        Text("Server Cards").tag(1)
+                        Text("Image Only").tag(2)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
                     
-                    if showCard {
-                        Picker("Example", selection: $selectedExample) {
-                            Text("Large Image").tag(0)
-                            Text("Server Cards").tag(1)
-                            Text("Image Only").tag(2)
-                        }
-                        .pickerStyle(SegmentedPickerStyle())
-                        .padding(.top, 8)
-                        
-                        if selectedExample == 1 {
-                            HStack {
-                                Button("Download Cards") {
-                                    downloadCards()
-                                }
-                                .buttonStyle(.borderedProminent)
+                    if selectedExample == 1 {
+                        HStack {
+                            Button("Download Cards") {
+                                downloadCards()
                             }
-                            .padding(.top, 8)
+                            .buttonStyle(.borderedProminent)
                         }
+                        .padding(.top, 8)
                     }
                 }
                 .padding()
@@ -222,59 +217,50 @@ struct JSONTemplateView: View{
                 
                 // Preview area
                 ZStack {
-                    if showCard {
-                        ScrollView {
-                            VStack(spacing: 20) {
-                                switch selectedExample {
-                                case 0:
-                                    // First example card (static)
-                                    if let schemaData = createMockSchemaData(jsonString: largeImageJSON),
-                                       let template = JSONTemplate(schemaData) {
-                                        template.view
-                                            .background(Color.white)
-                                            .padding(.horizontal)
-                                    } else {
-                                        Text("Error creating template")
-                                            .foregroundColor(.red)
-                                    }
-                                case 1:
-                                    // Server propositions (dynamic)
-                                    if savedCards.isEmpty {
-                                        Text("No cards available. Tap 'Download Cards' to get content cards from the server.")
-                                            .foregroundColor(.gray)
-                                            .multilineTextAlignment(.center)
-                                            .padding()
-                                    } else {
-                                        ForEach(savedCards) { card in
-                                            card.view
-                                                .background(Color.white)
-//                                                .cornerRadius(12)
-//                                                .shadow(radius: 5)
-                                                .padding(.horizontal)
-                                        }
-                                    }
-                                case 2:
-                                    // Weight and borders example (static)
-                                    if let schemaData = createMockSchemaData(jsonString: imageOnlyJSON),
-                                       let template = JSONTemplate(schemaData) {
-                                        template.view
-                                            .background(Color.white)
-                                            .padding(.horizontal)
-                                    } else {
-                                        Text("Error creating template")
-                                            .foregroundColor(.red)
-                                    }
-                                default:
-                                    Text("Select an example")
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            switch selectedExample {
+                            case 0:
+                                // First example card (static)
+                                if let schemaData = createMockSchemaData(jsonString: largeImageJSON),
+                                   let template = JSONTemplate(schemaData) {
+                                    template.view
+                                        .background(Color.white)
+                                        .padding(.horizontal)
+                                } else {
+                                    Text("Error creating template")
+                                        .foregroundColor(.red)
                                 }
+                            case 1:
+                                // Server propositions (dynamic)
+                                if savedCards.isEmpty {
+                                    Text("No cards available. Tap 'Download Cards' to get content cards from the server.")
+                                        .foregroundColor(.gray)
+                                        .multilineTextAlignment(.center)
+                                        .padding()
+                                } else {
+                                    ForEach(savedCards) { card in
+                                        card.view
+                                            .background(Color.white)
+                                            .padding(.horizontal)
+                                    }
+                                }
+                            case 2:
+                                // Weight and borders example (static)
+                                if let schemaData = createMockSchemaData(jsonString: imageOnlyJSON),
+                                   let template = JSONTemplate(schemaData) {
+                                    template.view
+                                        .background(Color.white)
+                                        .padding(.horizontal)
+                                } else {
+                                    Text("Error creating template")
+                                        .foregroundColor(.red)
+                                }
+                            default:
+                                Text("Select an example")
                             }
-                            .padding(.vertical)
                         }
-                    } else {
-                        Spacer()
-                        Text("Toggle 'Show Content Card' to preview the JSON templates")
-                            .foregroundColor(.gray)
-                        Spacer()
+                        .padding(.vertical)
                     }
                     
                     if showLoadingIndicator {
