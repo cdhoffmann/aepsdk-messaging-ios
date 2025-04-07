@@ -32,7 +32,7 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
     
     public var view: some View {
         buildCardView {
-            renderJSON(json: jsonData)
+            renderJSONComponent(json: jsonData)
                 .frame(maxWidth: .infinity)
         }
     }
@@ -51,346 +51,125 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
     
     // MARK: - JSON Rendering
     
-    /// Recursively renders a JSON object as a SwiftUI view
+    /// Recursively renders a JSON component
     @ViewBuilder
-    private func renderJSON(json: [String: Any]) -> some View {
+    private func renderJSONComponent(json: [String: Any], modifier: Modifier = Modifier()) -> some View {
         let type = json["type"] as? String ?? ""
+        let style = json["style"] as? [String: Any] ?? [:]
         
-        switch type {
+        // Apply style modifiers to the base modifier
+        let combinedModifier = modifier.apply(style: style)
+        
+        switch type.lowercased() {
         case "view":
-            renderViewComponent(json)
+            renderViewComponent(json: json, modifier: combinedModifier)
         case "text":
-            renderTextComponent(json)
+            renderTextComponent(json: json, modifier: combinedModifier)
         case "image":
-            renderImageComponent(json)
+            renderImageComponent(json: json, modifier: combinedModifier)
         case "button":
-            renderButtonComponent(json)
+            renderButtonComponent(json: json, modifier: combinedModifier)
         default:
             Text("Unsupported component type: \(type)")
                 .foregroundColor(.red)
-        }
-    }
-    
-    /// Renders a child component with appropriate layout properties
-    @ViewBuilder
-    private func renderChild(childJson: [String: Any], isHorizontal: Bool) -> some View {
-        let childStyle = childJson["style"] as? [String: Any] ?? [:]
-        let childType = childJson["type"] as? String ?? ""
-        
-        // Support both "weight" (original) and "flex" (new format)
-        let childWeight = childStyle["flex"] as? Int ?? childStyle["weight"] as? Int ?? 0
-        
-        // Check for fillWidth/fillHeight
-        let fillWidth = childStyle["fillWidth"] as? Bool == true
-        let fillHeight = childStyle["fillHeight"] as? Bool == true
-        
-        // First render the base view
-        let renderedView = renderJSON(json: childJson)
-        
-        // Then apply the layout constraints based on style properties
-        Group {
-            if isHorizontal {
-                if childWeight > 0 {
-                    // Use flex/weight for horizontal layouts
-                    renderedView
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .layoutPriority(Double(childWeight))
-                } else if fillWidth {
-                    // Fill width in horizontal container
-                    renderedView
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    // Default rendering for horizontal layouts
-                    renderedView
-                }
-            } else {
-                if childWeight > 0 {
-                    // Use flex/weight for vertical layouts
-                    renderedView
-                        .frame(maxWidth: .infinity)
-                        .layoutPriority(Double(childWeight))
-                } else if fillWidth {
-                    // For full-width components in vertical layouts
-                    renderedView
-                        .frame(maxWidth: .infinity)
-                } else if childType == "image" {
-                    // Special handling for images in vertical layouts
-                    renderedView
-                } else {
-                    // Default rendering for vertical layouts
-                    renderedView
-                        .frame(maxWidth: .infinity)
-                }
-            }
+                .applyModifier(combinedModifier)
         }
     }
     
     /// Renders a view component with its children
     @ViewBuilder
-    private func renderViewComponent(_ json: [String: Any]) -> some View {
+    private func renderViewComponent(json: [String: Any], modifier: Modifier) -> some View {
         let style = json["style"] as? [String: Any] ?? [:]
-        // Support both "child" (original) and "children" (new format)
-        let children = (json["children"] as? [Any])?.compactMap { $0 as? [String: Any] } ??
-                      (json["child"] as? [[String: Any]] ?? [])
-        
-        // Extract style properties
+        let children = (json["children"] as? [Any])?.compactMap { $0 as? [String: Any] } ?? []
         let flexDirection = style["flexDirection"] as? String ?? "column"
-        let padding = CGFloat(style["padding"] as? Int ?? 0)
-        let justifyContent = style["justifyContent"] as? String ?? "start"
         
-        // Get spacing between items (default to 0)
-        let spacing = CGFloat(style["spacing"] as? Int ?? 0)
-        
-        // Map justifyContent value to SwiftUI alignment
-        let alignment: HorizontalAlignment = mapJustifyContentToAlignment(justifyContent)
-        let verticalAlignment: VerticalAlignment = mapJustifyContentToVerticalAlignment(justifyContent)
-        
-        // Create container based on flex direction
-        Group {
-            if flexDirection == "row" {
-                HStack(alignment: .center, spacing: spacing) {
-                    ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
-                        self.renderChild(childJson: childJson, isHorizontal: true)
-                    }
+        switch flexDirection {
+        case "row":
+            HStack(alignment: getVerticalAlignment(style)) {
+                ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
+                    let childStyle = childJson["style"] as? [String: Any] ?? [:]
+                    let childModifier = self.createChildModifier(style: childStyle, isHorizontal: true)
+                    self.renderJSONComponent(json: childJson, modifier: childModifier)
                 }
-                .padding(padding)
-            } else {
-                // Handle "box" as a column layout (for compatibility)
-                VStack(alignment: alignment, spacing: spacing) {
-                    ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
-                        self.renderChild(childJson: childJson, isHorizontal: false)
-                    }
-                }
-                .padding(padding)
             }
-        }
-        .frame(maxWidth: .infinity)
-        .modifier(ViewStyleModifier(style: style))
-    }
-    
-    // Maps justifyContent values to SwiftUI horizontal alignment
-    private func mapJustifyContentToAlignment(_ justifyContent: String) -> HorizontalAlignment {
-        switch justifyContent.lowercased() {
-        case "start", "left":
-            return .leading
-        case "center":
-            return .center
-        case "end", "right":
-            return .trailing
-        case "top", "bottom":
-            // For vertical justification in horizontal layouts, default to leading
-            return .leading
+            .applyModifier(modifier)
+            
+        case "column":
+            VStack(alignment: getHorizontalAlignment(style)) {
+                ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
+                    let childStyle = childJson["style"] as? [String: Any] ?? [:]
+                    let childModifier = self.createChildModifier(style: childStyle, isHorizontal: false)
+                    self.renderJSONComponent(json: childJson, modifier: childModifier)
+                }
+            }
+            .applyModifier(modifier)
+            
         default:
-            return .leading
-        }
-    }
-    
-    // Maps justifyContent values to SwiftUI vertical alignment
-    private func mapJustifyContentToVerticalAlignment(_ justifyContent: String) -> VerticalAlignment {
-        switch justifyContent.lowercased() {
-        case "start", "left", "right":
-            // For horizontal justification in vertical layouts, default to top
-            return .top
-        case "center":
-            return .center
-        case "end":
-            return .bottom
-        case "top":
-            return .top
-        case "bottom":
-            return .bottom
-        default:
-            return .top
+            // Default to a Box-like layout using ZStack
+            ZStack(alignment: getAlignment(style)) {
+                ForEach(Array(children.enumerated()), id: \.offset) { index, childJson in
+                    let childStyle = childJson["style"] as? [String: Any] ?? [:]
+                    let childModifier = self.createChildModifier(style: childStyle, isHorizontal: false)
+                    self.renderJSONComponent(json: childJson, modifier: childModifier)
+                }
+            }
+            .applyModifier(modifier)
         }
     }
     
     /// Renders a text component
     @ViewBuilder
-    private func renderTextComponent(_ json: [String: Any]) -> some View {
+    private func renderTextComponent(json: [String: Any], modifier: Modifier) -> some View {
         let content = json["content"] as? String ?? ""
         let style = json["style"] as? [String: Any] ?? [:]
-        // Fix for the field name typo in the example JSON
-        let styleWithFallback = json["tyle"] as? [String: Any] ?? style
         
         Text(content)
-            .modifier(TextStyleModifier(style: styleWithFallback))
+            .font(createFont(style: style))
+            .foregroundColor(JSONTemplate.parseColor(style["color"]) ?? Color.primary)
+            .multilineTextAlignment(getTextAlignment(style))
+            .applyModifier(modifier)
     }
     
     /// Renders an image component
     @ViewBuilder
-    private func renderImageComponent(_ json: [String: Any]) -> some View {
+    private func renderImageComponent(json: [String: Any], modifier: Modifier) -> some View {
         let urlString = json["url"] as? String ?? ""
         let style = json["style"] as? [String: Any] ?? [:]
-        // Fix for the field name typo in the example JSON
-        let styleWithFallback = json["tyle"] as? [String: Any] ?? style
-        let contentScale = styleWithFallback["contentScale"] as? String ?? "fit"
-        let borderRadius = CGFloat(styleWithFallback["borderRadius"] as? Int ?? 0)
         
-        // Get margin values
-        let marginLeft = CGFloat(styleWithFallback["marginLeft"] as? Int ?? 0)
-        let marginRight = CGFloat(styleWithFallback["marginRight"] as? Int ?? 0)
-        let marginTop = CGFloat(styleWithFallback["marginTop"] as? Int ?? 0)
-        let marginBottom = CGFloat(styleWithFallback["marginBottom"] as? Int ?? 0)
-        
-        // Extract key properties
-        let shouldFillWidth = styleWithFallback["fillWidth"] as? Bool == true
-        let aspectRatioStr = styleWithFallback["aspectRatio"] as? String
-        let aspectRatio = aspectRatioStr.flatMap(parseAspectRatio)
-        
-        // Simple direct approach for image rendering
         if let url = URL(string: urlString) {
-            // Use a ZStack for proper clipping and positioning
-            ZStack {
-                // Use GeometryReader only when needed for aspect ratio calculations
-                if aspectRatio != nil || shouldFillWidth {
-                    GeometryReader { geometry in
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView()
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .apply(contentScale: contentScale)
-                                    .aspectRatio(aspectRatio, contentMode: self.contentScaleToAspectRatioMode(contentScale))
-                                    .frame(width: shouldFillWidth ? geometry.size.width : nil, 
-                                           height: aspectRatio != nil ? geometry.size.width / aspectRatio! : nil)
-                            case .failure:
-                                Image(systemName: "photo")
-                                    .foregroundColor(.gray)
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
+            ZStack(alignment: .center) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .applyContentScale(style: style)
+                            .applyAspectRatio(style: style)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .foregroundColor(.gray)
+                    @unknown default:
+                        EmptyView()
                     }
-                    // Set minimum height for aspect ratio images
-                    .frame(minHeight: aspectRatio != nil ? 150 : nil)
-                } else {
-                    // Simpler rendering for basic images
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .apply(contentScale: contentScale)
-                        case .failure:
-                            Image(systemName: "photo")
-                                .foregroundColor(.gray)
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                    .frame(height: 120) // Default height for basic images
                 }
             }
-            .cornerRadius(borderRadius)
-            .clipped()
-            .frame(maxWidth: shouldFillWidth ? .infinity : nil)
-            .padding(.leading, marginLeft)
-            .padding(.trailing, marginRight)
-            .padding(.top, marginTop)
-            .padding(.bottom, marginBottom)
+            .applyModifier(modifier)
         } else {
-            // Placeholder for invalid URL
             Image(systemName: "photo")
                 .foregroundColor(.gray)
-                .frame(height: 120)
-                .cornerRadius(borderRadius)
-                .padding(.leading, marginLeft)
-                .padding(.trailing, marginRight)
-                .padding(.top, marginTop)
-                .padding(.bottom, marginBottom)
-        }
-    }
-    
-    // Helper method to calculate width
-    private func calculateWidth(style: [String: Any]) -> CGFloat? {
-        // Check for fillWidth first - if true, return .infinity to fill container
-        if let fillWidth = style["fillWidth"] as? Bool, fillWidth {
-            return .infinity
-        }
-        
-        // If fillWidth is false or not specified, check for explicit width
-        if let width = style["width"] as? Int {
-            if width == -1 {
-                return .infinity
-            } else if width > 0 {
-                return CGFloat(width)
-            }
-        }
-        
-        return nil
-    }
-    
-    // Helper method to calculate height
-    private func calculateHeight(style: [String: Any]) -> CGFloat {
-        // Check for fillHeight first - if true, return .infinity to fill container
-        if let fillHeight = style["fillHeight"] as? Bool, fillHeight {
-            return .infinity
-        }
-        
-        // If fillHeight is false or not specified, check for explicit height
-        if let height = style["height"] as? Int {
-            if height == -1 {
-                return .infinity
-            } else if height > 0 {
-                return CGFloat(height)
-            }
-        }
-        
-        // If aspectRatio is specified and fillWidth is true, calculate height based on aspect ratio
-        if let aspectRatioStr = style["aspectRatio"] as? String,
-           let fillWidth = style["fillWidth"] as? Bool, fillWidth {
-            if let aspectRatio = parseAspectRatio(aspectRatioStr) {
-                // When using with fillWidth, we'll calculate the actual height in the view
-                // Return a placeholder value for now
-                return 0 // Placeholder - will be calculated based on container width
-            }
-        }
-        
-        return 80 // Default height if nothing else is specified
-    }
-    
-    // Parse aspectRatio from string format like "100/300"
-    private func parseAspectRatio(_ aspectRatioStr: String) -> CGFloat? {
-        let components = aspectRatioStr.components(separatedBy: "/")
-        if components.count == 2,
-           let width = Double(components[0]),
-           let height = Double(components[1]),
-           width > 0, height > 0 {
-            // Aspect ratio should be calculated as width divided by height
-            // For "300/100", this gives us 3.0, meaning the width is 3x the height
-            return CGFloat(width / height)
-        }
-        return nil
-    }
-    
-    // Convert content scale string to SwiftUI AspectRatio.ContentMode
-    private func contentScaleToAspectRatioMode(_ contentScale: String) -> ContentMode {
-        switch contentScale.lowercased() {
-        case "fill":
-            return .fill
-        case "fit", "none":
-            return .fit
-        case "crop":
-            // For crop, we use fill and rely on .clipped() to crop it
-            return .fill
-        default:
-            return .fit
+                .applyModifier(modifier)
         }
     }
     
     /// Renders a button component
     @ViewBuilder
-    private func renderButtonComponent(_ json: [String: Any]) -> some View {
+    private func renderButtonComponent(json: [String: Any], modifier: Modifier) -> some View {
         let label = json["label"] as? String ?? "Button"
         let actionUrlString = json["actionUrl"] as? String
         let interactionId = json["interactionId"] as? String ?? "button_tapped"
         let style = json["style"] as? [String: Any] ?? [:]
-        // Fix for the field name typo in the example JSON
-        let styleWithFallback = json["tyle"] as? [String: Any] ?? style
         
         Button(action: {
             // Handle button tap by creating a track interaction
@@ -401,62 +180,169 @@ public class JSONTemplate: BaseTemplate, ContentCardTemplate, Identifiable {
             }
         }) {
             Text(label)
-                .modifier(ButtonLabelModifier(style: styleWithFallback))
+                .font(createFont(style: style))
+                .foregroundColor(JSONTemplate.parseColor(style["textColor"]) ?? .white)
+                .lineLimit(1)
+                .padding(.vertical, CGFloat(style["paddingVertical"] as? Int ?? 8))
+                .padding(.horizontal, CGFloat(style["paddingHorizontal"] as? Int ?? 12))
         }
-        .modifier(ButtonStyleModifier(style: styleWithFallback))
+        .background(JSONTemplate.parseColor(style["backgroundColor"]) ?? .blue)
+        .cornerRadius(CGFloat(style["borderRadius"] as? Int ?? 4))
+        .applyModifier(modifier)
     }
-}
-
-// MARK: - Style Modifiers
-
-/// Modifier for handling width percentage values
-@available(iOS 15.0, *)
-struct WidthPercentageModifier: ViewModifier {
-    let percentage: Double
     
-    func body(content: Content) -> some View {
-        GeometryReader { geometry in
-            content
-                .frame(width: geometry.size.width * percentage / 100.0)
+    // MARK: - Helper Methods for Layout
+    
+    /// Gets the SwiftUI horizontal alignment from style
+    private func getHorizontalAlignment(_ style: [String: Any]) -> HorizontalAlignment {
+        let alignItems = style["alignItems"] as? String ?? ""
+        switch alignItems.lowercased() {
+        case "center":
+            return .center
+        case "flex-start", "start", "left":
+            return .leading
+        case "flex-end", "end", "right":
+            return .trailing
+        default:
+            return .leading
         }
     }
-}
-
-/// Style modifier for view components
-@available(iOS 15.0, *)
-struct ViewStyleModifier: ViewModifier {
-    let style: [String: Any]
     
-    func body(content: Content) -> some View {
-        let borderRadius = CGFloat(style["borderRadius"] as? Int ?? 0)
-        let borderWidth = CGFloat(style["borderWidth"] as? Int ?? 0)
-        let borderColor = parseColor(style["borderColor"]) ?? Color.clear
-        let backgroundColor = parseColor(style["backgroundColor"])
+    /// Gets the SwiftUI vertical alignment from style
+    private func getVerticalAlignment(_ style: [String: Any]) -> VerticalAlignment {
+        let alignItems = style["alignItems"] as? String ?? ""
+        switch alignItems.lowercased() {
+        case "center":
+            return .center
+        case "flex-start", "start", "top":
+            return .top
+        case "flex-end", "end", "bottom":
+            return .bottom
+        default:
+            return .center
+        }
+    }
+    
+    /// Gets the alignment for ZStack
+    private func getAlignment(_ style: [String: Any]) -> Alignment {
+        let alignItems = style["alignItems"] as? String ?? ""
+        switch alignItems.lowercased() {
+        case "center":
+            return .center
+        case "topstart", "topleft":
+            return .topLeading
+        case "top":
+            return .top
+        case "topend", "topright":
+            return .topTrailing
+        case "start", "left":
+            return .leading
+        case "end", "right":
+            return .trailing
+        case "bottomstart", "bottomleft":
+            return .bottomLeading
+        case "bottom":
+            return .bottom
+        case "bottomend", "bottomright":
+            return .bottomTrailing
+        default:
+            return .center
+        }
+    }
+    
+    /// Gets the text alignment from style
+    private func getTextAlignment(_ style: [String: Any]) -> TextAlignment {
+        let textAlign = style["textAlign"] as? String ?? ""
+        switch textAlign.lowercased() {
+        case "center":
+            return .center
+        case "right", "end":
+            return .trailing
+        case "left", "start":
+            return .leading
+        default:
+            return .leading
+        }
+    }
+    
+    /// Creates a child modifier with appropriate layout constraints
+    private func createChildModifier(style: [String: Any], isHorizontal: Bool) -> Modifier {
+        var modifier = Modifier()
         
-        // Apply styles in the correct order for proper rendering
-        content
-            // First reset any default spacing or padding that might interfere
-            .padding(0)
-            // Apply background first
-            .background(
-                RoundedRectangle(cornerRadius: borderRadius)
-                    .fill(backgroundColor ?? Color.clear)
-            )
-            // Then apply clipping so content doesn't overflow the border radius
-            .clipShape(RoundedRectangle(cornerRadius: borderRadius))
-            // Apply border as an overlay for better control
-            .overlay(
-                RoundedRectangle(cornerRadius: borderRadius)
-                    .strokeBorder(borderColor, lineWidth: borderWidth)
-            )
-            // External margins are applied last
-            .padding(.leading, CGFloat(style["marginLeft"] as? Int ?? 0))
-            .padding(.trailing, CGFloat(style["marginRight"] as? Int ?? 0))
-            .padding(.top, CGFloat(style["marginTop"] as? Int ?? 0))
-            .padding(.bottom, CGFloat(style["marginBottom"] as? Int ?? 0))
+        // Apply flex/weight if specified
+        if let flex = style["flex"] as? Int, flex > 0 {
+            let flexValue = Double(flex)
+            if isHorizontal {
+                modifier = modifier.weight(flexValue)
+            } else {
+                modifier = modifier.weight(flexValue)
+            }
+        }
+        
+        // Apply alignment if specified
+        if let justifyContent = style["justifyContent"] as? String {
+            if isHorizontal {
+                switch justifyContent.lowercased() {
+                case "center":
+                    modifier = modifier.alignVertically(.center)
+                case "flex-start", "top", "start":
+                    modifier = modifier.alignVertically(.top)
+                case "flex-end", "bottom", "end":
+                    modifier = modifier.alignVertically(.bottom)
+                default:
+                    break
+                }
+            } else {
+                switch justifyContent.lowercased() {
+                case "center":
+                    modifier = modifier.alignHorizontally(.center)
+                case "flex-start", "left", "start":
+                    modifier = modifier.alignHorizontally(.leading)
+                case "flex-end", "right", "end":
+                    modifier = modifier.alignHorizontally(.trailing)
+                default:
+                    break
+                }
+            }
+        }
+        
+        return modifier
     }
     
-    private func parseColor(_ value: Any?) -> Color? {
+    // MARK: - Helper Methods for Styling
+    
+    /// Creates a font from style properties
+    private func createFont(style: [String: Any]) -> Font {
+        let size = CGFloat(style["fontSize"] as? Int ?? 14)
+        let weightString = style["fontWeight"] as? String ?? ""
+        
+        let weight: Font.Weight
+        switch weightString {
+        case "bold", "700":
+            weight = .bold
+        case "semibold", "600":
+            weight = .semibold
+        case "medium", "500":
+            weight = .medium
+        case "regular", "400":
+            weight = .regular
+        case "light", "300":
+            weight = .light
+        case "thin", "100":
+            weight = .thin
+        case "heavy", "800":
+            weight = .heavy
+        case "black", "900":
+            weight = .black
+        default:
+            weight = .regular
+        }
+        
+        return Font.system(size: size, weight: weight)
+    }
+    
+    /// Parses a color string to SwiftUI Color
+    static func parseColor(_ value: Any?) -> Color? {
         // Handle hex color strings
         if let hexString = value as? String, hexString.hasPrefix("#") {
             let hex = hexString.dropFirst()
@@ -508,208 +394,293 @@ struct ViewStyleModifier: ViewModifier {
         default: return nil
         }
     }
-}
-
-/// Style modifier for text components
-@available(iOS 15.0, *)
-struct TextStyleModifier: ViewModifier {
-    let style: [String: Any]
     
-    func body(content: Content) -> some View {
-        content
-            .font(createFont())
-            .foregroundColor(parseColor(style["color"]))
-            .padding(.leading, CGFloat(style["marginLeft"] as? Int ?? 0))
-            .padding(.trailing, CGFloat(style["marginRight"] as? Int ?? 0))
-            .padding(.top, CGFloat(style["marginTop"] as? Int ?? 0))
-            .padding(.bottom, CGFloat(style["marginBottom"] as? Int ?? 0))
-    }
-    
-    private func createFont() -> Font {
-        let size = CGFloat(style["fontSize"] as? Int ?? 14)
-        let weight = parseFontWeight(style["fontWeight"])
-        
-        return Font.system(size: size, weight: weight)
-    }
-    
-    private func parseFontWeight(_ value: Any?) -> Font.Weight {
-        guard let weightString = value as? String else {
-            return .regular
+    // Parse aspectRatio from string format like "100/300"
+    private func parseAspectRatio(_ aspectRatioStr: String) -> CGFloat? {
+        let components = aspectRatioStr.components(separatedBy: "/")
+        if components.count == 2,
+           let width = Double(components[0]),
+           let height = Double(components[1]),
+           width > 0, height > 0 {
+            return CGFloat(width / height)
         }
-        
-        switch weightString {
-        case "bold": return .bold
-        case "semibold": return .semibold
-        case "medium": return .medium
-        case "light": return .light
-        case "thin": return .thin
-        case "heavy": return .heavy
-        case "black": return .black
-        default: return .regular
-        }
-    }
-    
-    private func parseColor(_ value: Any?) -> Color? {
-        guard let colorString = value as? String else {
-            return nil
-        }
-        
-        // Simple color parsing - could be extended for more colors or hex values
-        switch colorString.lowercased() {
-        case "red": return .red
-        case "blue": return .blue
-        case "green": return .green
-        case "yellow": return .yellow
-        case "gray", "grey": return .gray
-        case "black": return .black
-        case "white": return .white
-        default: return nil
-        }
+        return nil
     }
 }
 
-/// Style modifier for image components with percentage-based width
+// MARK: - View Modifiers and Extensions
+
 @available(iOS 15.0, *)
-struct ImagePercentageModifier: ViewModifier {
-    let style: [String: Any]
+struct Modifier {
+    var frame: FrameModifier?
+    var padding: PaddingModifier?
+    var margin: MarginModifier?
+    var background: BackgroundModifier?
+    var border: BorderModifier?
+    var alignment: AlignmentModifier?
+    var weight: WeightModifier?
     
-    func body(content: Content) -> some View {
-        Group {
-            if let widthPercentage = style["widthPercentage"] as? String,
-               widthPercentage.hasSuffix("%"),
-               let percentValue = Double(widthPercentage.dropLast()) {
-                GeometryReader { geometry in
-                    content
-                        .frame(width: geometry.size.width * percentValue / 100.0)
-                }
-            } else {
-                content
+    init() {}
+    
+    func apply(style: [String: Any]) -> Modifier {
+        var newModifier = self
+        
+        // Apply frame modifiers
+        newModifier.frame = FrameModifier(
+            width: style["width"] as? Int,
+            height: style["height"] as? Int,
+            fillWidth: style["fillWidth"] as? Bool ?? false,
+            fillHeight: style["fillHeight"] as? Bool ?? false
+        )
+        
+        // Apply padding modifiers
+        newModifier.padding = PaddingModifier(
+            all: style["padding"] as? Int,
+            vertical: style["paddingVertical"] as? Int,
+            horizontal: style["paddingHorizontal"] as? Int
+        )
+        
+        // Apply margin modifiers
+        newModifier.margin = MarginModifier(
+            left: style["marginLeft"] as? Int,
+            right: style["marginRight"] as? Int,
+            top: style["marginTop"] as? Int,
+            bottom: style["marginBottom"] as? Int
+        )
+        
+        // Apply background modifiers
+        if let backgroundColorStr = style["backgroundColor"] as? String {
+            if let backgroundColor = JSONTemplate.parseColor(backgroundColorStr) {
+                newModifier.background = BackgroundModifier(color: backgroundColor)
             }
         }
+        
+        // Apply border modifiers
+        let borderWidth = style["borderWidth"] as? Int ?? 0
+        if borderWidth > 0 {
+            let borderColor = style["borderColor"].flatMap { JSONTemplate.parseColor($0) } ?? Color.black
+            let borderRadius = CGFloat(style["borderRadius"] as? Int ?? 0)
+            
+            newModifier.border = BorderModifier(
+                width: CGFloat(borderWidth),
+                color: borderColor,
+                radius: borderRadius
+            )
+        } else if let borderRadius = style["borderRadius"] as? Int, borderRadius > 0 {
+            newModifier.border = BorderModifier(
+                width: 0,
+                color: .clear,
+                radius: CGFloat(borderRadius)
+            )
+        }
+        
+        return newModifier
+    }
+    
+    func weight(_ value: Double) -> Modifier {
+        var newModifier = self
+        newModifier.weight = WeightModifier(value: value)
+        return newModifier
+    }
+    
+    func alignHorizontally(_ alignment: HorizontalAlignment) -> Modifier {
+        var newModifier = self
+        if newModifier.alignment == nil {
+            newModifier.alignment = AlignmentModifier()
+        }
+        newModifier.alignment?.horizontal = alignment
+        return newModifier
+    }
+    
+    func alignVertically(_ alignment: VerticalAlignment) -> Modifier {
+        var newModifier = self
+        if newModifier.alignment == nil {
+            newModifier.alignment = AlignmentModifier()
+        }
+        newModifier.alignment?.vertical = alignment
+        return newModifier
     }
 }
 
-/// Style modifier for button label
 @available(iOS 15.0, *)
-struct ButtonLabelModifier: ViewModifier {
-    let style: [String: Any]
-    
-    func body(content: Content) -> some View {
-        content
-            .font(createFont())
-            .foregroundColor(parseColor(style["textColor"]) ?? .white)
-            .lineLimit(1)
-            .padding(.vertical, CGFloat(style["paddingVertical"] as? Int ?? 8))
-            .padding(.horizontal, CGFloat(style["paddingHorizontal"] as? Int ?? 12))
-    }
-    
-    private func createFont() -> Font {
-        let size = CGFloat(style["fontSize"] as? Int ?? 14)
-        let weight = parseFontWeight(style["fontWeight"])
-        
-        return Font.system(size: size, weight: weight)
-    }
-    
-    private func parseFontWeight(_ value: Any?) -> Font.Weight {
-        guard let weightString = value as? String else {
-            return .regular
-        }
-        
-        switch weightString {
-        case "bold": return .bold
-        case "semibold": return .semibold
-        case "medium": return .medium
-        case "light": return .light
-        case "thin": return .thin
-        case "heavy": return .heavy
-        case "black": return .black
-        default: return .regular
-        }
-    }
-    
-    private func parseColor(_ value: Any?) -> Color? {
-        guard let colorString = value as? String else {
-            return nil
-        }
-        
-        // Simple color parsing - could be extended for more colors or hex values
-        switch colorString.lowercased() {
-        case "red": return .red
-        case "blue": return .blue
-        case "green": return .green
-        case "yellow": return .yellow
-        case "gray", "grey": return .gray
-        case "black": return .black
-        case "white": return .white
-        default: return nil
-        }
-    }
+struct FrameModifier {
+    let width: Int?
+    let height: Int?
+    let fillWidth: Bool
+    let fillHeight: Bool
 }
 
-/// Style modifier for button components
 @available(iOS 15.0, *)
-struct ButtonStyleModifier: ViewModifier {
-    let style: [String: Any]
-    
-    func body(content: Content) -> some View {
-        content
-            .background(parseColor(style["backgroundColor"]) ?? .blue)
-            .cornerRadius(CGFloat(style["borderRadius"] as? Int ?? 4))
-            .padding(.leading, CGFloat(style["marginLeft"] as? Int ?? 0))
-            .padding(.trailing, CGFloat(style["marginRight"] as? Int ?? 0))
-            .padding(.top, CGFloat(style["marginTop"] as? Int ?? 0))
-            .padding(.bottom, CGFloat(style["marginBottom"] as? Int ?? 8))
-    }
-    
-    private func parseColor(_ value: Any?) -> Color? {
-        guard let colorString = value as? String else {
-            return nil
-        }
-        
-        // Simple color parsing - could be extended for more colors or hex values
-        switch colorString.lowercased() {
-        case "red": return .red
-        case "blue": return .blue
-        case "green": return .green
-        case "yellow": return .yellow
-        case "gray", "grey": return .gray
-        case "black": return .black
-        case "white": return .white
-        default: return nil
-        }
-    }
+struct PaddingModifier {
+    let all: Int?
+    let vertical: Int?
+    let horizontal: Int?
 }
 
-// MARK: - View Extensions
+@available(iOS 15.0, *)
+struct MarginModifier {
+    let left: Int?
+    let right: Int?
+    let top: Int?
+    let bottom: Int?
+}
+
+@available(iOS 15.0, *)
+struct BackgroundModifier {
+    let color: Color
+}
+
+@available(iOS 15.0, *)
+struct BorderModifier {
+    let width: CGFloat
+    let color: Color
+    let radius: CGFloat
+}
+
+@available(iOS 15.0, *)
+struct AlignmentModifier {
+    var horizontal: HorizontalAlignment?
+    var vertical: VerticalAlignment?
+}
+
+@available(iOS 15.0, *)
+struct WeightModifier {
+    let value: Double
+}
 
 @available(iOS 15.0, *)
 extension View {
-    /// Applies the appropriate content scale mode to an image
     @ViewBuilder
-    func apply(contentScale: String) -> some View {
+    func applyModifier(_ modifier: Modifier) -> some View {
+        self
+            // Apply frame
+            .then { view in
+                if let frame = modifier.frame {
+                    if frame.fillWidth && frame.fillHeight {
+                        return AnyView(view.frame(maxWidth: .infinity, maxHeight: .infinity))
+                    } else if frame.fillWidth {
+                        return AnyView(view.frame(maxWidth: .infinity))
+                    } else if frame.fillHeight {
+                        return AnyView(view.frame(maxHeight: .infinity))
+                    } else if let width = frame.width, let height = frame.height {
+                        return AnyView(view.frame(width: CGFloat(width), height: CGFloat(height)))
+                    } else if let width = frame.width {
+                        return AnyView(view.frame(width: CGFloat(width)))
+                    } else if let height = frame.height {
+                        return AnyView(view.frame(height: CGFloat(height)))
+                    }
+                }
+                return AnyView(view)
+            }
+            // Apply padding
+            .then { view in
+                if let padding = modifier.padding {
+                    if let all = padding.all {
+                        return AnyView(view.padding(EdgeInsets(top: CGFloat(all), leading: CGFloat(all), bottom: CGFloat(all), trailing: CGFloat(all))))
+                    }
+                    
+                    var edgeInsets = EdgeInsets()
+                    if let vertical = padding.vertical {
+                        edgeInsets.top = CGFloat(vertical)
+                        edgeInsets.bottom = CGFloat(vertical)
+                    }
+                    if let horizontal = padding.horizontal {
+                        edgeInsets.leading = CGFloat(horizontal)
+                        edgeInsets.trailing = CGFloat(horizontal)
+                    }
+                    
+                    if edgeInsets != EdgeInsets() {
+                        return AnyView(view.padding(edgeInsets))
+                    }
+                }
+                return AnyView(view)
+            }
+            // Apply margin
+            .then { view in
+                if let margin = modifier.margin {
+                    var edgeInsets = EdgeInsets()
+                    if let left = margin.left {
+                        edgeInsets.leading = CGFloat(left)
+                    }
+                    if let right = margin.right {
+                        edgeInsets.trailing = CGFloat(right)
+                    }
+                    if let top = margin.top {
+                        edgeInsets.top = CGFloat(top)
+                    }
+                    if let bottom = margin.bottom {
+                        edgeInsets.bottom = CGFloat(bottom)
+                    }
+                    
+                    if edgeInsets != EdgeInsets() {
+                        return AnyView(view.padding(edgeInsets))
+                    }
+                }
+                return AnyView(view)
+            }
+            // Apply background
+            .then { view in
+                if let background = modifier.background {
+                    return AnyView(view.background(background.color))
+                }
+                return AnyView(view)
+            }
+            // Apply border
+            .then { view in
+                if let border = modifier.border {
+                    if border.width > 0 {
+                        let shape = RoundedRectangle(cornerRadius: border.radius)
+                        return AnyView(
+                            view.overlay(
+                                shape.strokeBorder(border.color, lineWidth: border.width)
+                            )
+                            .clipShape(shape)
+                        )
+                    } else if border.radius > 0 {
+                        return AnyView(view.clipShape(RoundedRectangle(cornerRadius: border.radius)))
+                    }
+                }
+                return AnyView(view)
+            }
+            // Apply alignment and weight are handled differently in each container
+    }
+    
+    @ViewBuilder
+    func then<Result: View>(_ transform: (Self) -> Result) -> some View {
+        transform(self)
+    }
+    
+    /// Applies content scale
+    @ViewBuilder
+    func applyContentScale(style: [String: Any]) -> some View {
+        let contentScale = style["contentScale"] as? String ?? "fit"
+        
         switch contentScale.lowercased() {
         case "fill":
             self.scaledToFill()
-        case "fit":
+        case "fit", "none":
             self.scaledToFit()
         case "crop":
-            self.scaledToFill()
-                .clipped()
-        case "none":
-            self
+            self.scaledToFill().clipped()
         default:
-            self.scaledToFit() // Default to fit
+            self.scaledToFit()
         }
     }
     
-    /// Applies a modifier conditionally
+    /// Applies aspect ratio
     @ViewBuilder
-    func `if`<Content: View>(
-        _ condition: Bool,
-        transform: (Self) -> Content
-    ) -> some View {
-        if condition {
-            transform(self)
+    func applyAspectRatio(style: [String: Any]) -> some View {
+        if let aspectRatioStr = style["aspectRatio"] as? String {
+            let components = aspectRatioStr.components(separatedBy: "/")
+            if components.count == 2,
+               let width = Double(components[0]),
+               let height = Double(components[1]),
+               width > 0, height > 0 {
+                let ratio = width / height
+                self.aspectRatio(ratio, contentMode: .fit)
+            } else {
+                self
+            }
         } else {
             self
         }
