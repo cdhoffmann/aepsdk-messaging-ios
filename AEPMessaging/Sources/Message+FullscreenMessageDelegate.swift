@@ -19,7 +19,11 @@ extension Message: FullscreenMessageDelegate {
         guard let message = message.parent else {
             return
         }
-
+        // Initialize JavaScript bridge when the message is shown (WebView is guaranteed to be ready)
+        if !message.isBridgeInitialized {
+            message.initializeJavaScriptBridge()
+            message.isBridgeInitialized = true
+        }
         if message.autoTrack {
             message.track(withEdgeEventType: .display)
         }

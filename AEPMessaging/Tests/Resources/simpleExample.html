@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: system-ui;
+            text-align: center;
+            padding: 40px 20px;
+            background: #f8f9fa;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 300px;
+            margin: 0 auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        p {
+            color: #666;
+            margin-bottom: 25px;
+        }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+            width: 100%;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .secondary {
+            background: #6c757d;
+        }
+        .secondary:hover {
+            background: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🎉 Special Offer!</h1>
+        <p>Get 20% off your next purchase. Limited time only!</p>
+        
+        <!-- That's it! Just use aepBridge directly - no setup needed -->
+        <button onclick="aepBridge.logClick('offer_accepted'); aepBridge.closeMessage();">
+            Claim Offer
+        </button>
+        
+        <button class="secondary" onclick="aepBridge.closeMessage();">
+            Maybe Later
+        </button>
+    </div>
+</body>
+</html> 

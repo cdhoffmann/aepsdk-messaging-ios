@@ -50,6 +50,9 @@ public class Message: NSObject {
     /// Holds XDM data necessary for tracking `Message` interactions with Adobe Journey Optimizer.
     var propositionInfo: PropositionInfo?
 
+    /// Flag to track if the JavaScript bridge has been initialized
+    var isBridgeInitialized = false
+
     /// Basic initializer only called by convenience constructor
     init(parent: Messaging, triggeringEvent: Event) {
         id = ""
@@ -112,6 +115,19 @@ public class Message: NSObject {
     @objc(handleJavascriptMessage:withHandler:)
     public func handleJavascriptMessage(_ name: String, withHandler handler: @escaping (Any?) -> Void) {
         fullscreenMessage?.handleJavascriptMessage(name, withHandler: handler)
+    }
+    
+    /// Initializes the JavaScript bridge for this message
+    ///
+    /// This method injects the necessary JavaScript into the message's webview
+    /// and sets up standard message handlers.
+    @objc public func initializeJavaScriptBridge() {
+        guard let webView = view as? WKWebView else {
+            Log.debug(label: MessagingConstants.LOG_TAG, "Cannot initialize JavaScript bridge, WKWebView not found.")
+            return
+        }
+        
+        MessagingBridge.shared.registerWebView(webView, withMessage: self)
     }
 
     // MARK: - Internal methods
@@ -195,7 +211,7 @@ extension Message {
         if usingLocalAssets {
             message.fullscreenMessage?.setAssetMap(message.assets)
         }
-
+        
         return message
     }
 }

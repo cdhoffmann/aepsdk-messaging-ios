@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: system-ui;
+            text-align: center;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            display: block;
+            width: 200px;
+            margin: 10px auto;
+        }
+        button:hover {
+            background: #0056CC;
+        }
+        .debug {
+            margin-top: 20px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bare Bones Bridge Test</h1>
+    
+    <button onclick="testCloseMessage()">Close Message (Bridge)</button>
+    <button onclick="testLogClick()">Log Click (Bridge)</button>
+    <button onclick="testDirectHandlers()">Test Direct Handlers</button>
+    <button onclick="checkBridge()">Check Bridge Status</button>
+    
+    <div class="debug" id="debug">
+        Debug info will appear here...<br>
+    </div>
+
+    <script>
+        function log(message) {
+            const debugDiv = document.getElementById('debug');
+            const timestamp = new Date().toLocaleTimeString();
+            debugDiv.innerHTML += timestamp + ': ' + message + '<br>';
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function testCloseMessage() {
+            log('Testing closeMessage via bridge...');
+            if (window.aepBridge && window.aepBridge.closeMessage) {
+                window.aepBridge.closeMessage();
+                log('✅ closeMessage called successfully');
+            } else {
+                log('❌ ERROR: aepBridge.closeMessage not available');
+            }
+        }
+        
+        function testLogClick() {
+            log('Testing logClick via bridge...');
+            if (window.aepBridge && window.aepBridge.logClick) {
+                window.aepBridge.logClick('test_button');
+                log('✅ logClick called with "test_button"');
+            } else {
+                log('❌ ERROR: aepBridge.logClick not available');
+            }
+        }
+        
+        function testDirectHandlers() {
+            log('Testing direct message handlers...');
+            
+            // Test aepCloseMessage handler directly (like Adobe docs show)
+            try {
+                webkit.messageHandlers.aepCloseMessage.postMessage(null);
+                log('✅ Direct aepCloseMessage call succeeded');
+            } catch(err) {
+                log('❌ Direct aepCloseMessage failed: ' + err.message);
+            }
+            
+            // Test aepLogClick handler directly
+            try {
+                webkit.messageHandlers.aepLogClick.postMessage('direct_test');
+                log('✅ Direct aepLogClick call succeeded');
+            } catch(err) {
+                log('❌ Direct aepLogClick failed: ' + err.message);
+            }
+        }
+        
+        function checkBridge() {
+            log('=== Bridge Status Check ===');
+            log('window.aepBridge exists: ' + (window.aepBridge ? 'YES' : 'NO'));
+            
+            if (window.aepBridge) {
+                log('Available methods: ' + Object.keys(window.aepBridge).join(', '));
+            }
+            
+            log('window.webkit exists: ' + (window.webkit ? 'YES' : 'NO'));
+            
+            if (window.webkit && window.webkit.messageHandlers) {
+                const handlers = Object.keys(window.webkit.messageHandlers);
+                log('Available message handlers: ' + (handlers.length > 0 ? handlers.join(', ') : 'NONE'));
+                
+                // Check for our specific handlers
+                log('aepCloseMessage handler: ' + (window.webkit.messageHandlers.aepCloseMessage ? 'YES' : 'NO'));
+                log('aepLogClick handler: ' + (window.webkit.messageHandlers.aepLogClick ? 'YES' : 'NO'));
+            } else {
+                log('window.webkit.messageHandlers: NOT AVAILABLE');
+            }
+            log('=== End Status Check ===');
+        }
+        
+        // Check bridge status on load
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                log('Page loaded, checking bridge...');
+                checkBridge();
+            }, 500);
+        });
+        
+        // Log any JavaScript errors
+        window.addEventListener('error', function(e) {
+            log('❌ JavaScript Error: ' + e.message + ' at line ' + e.lineno);
+        });
+    </script>
+</body>
+</html> 

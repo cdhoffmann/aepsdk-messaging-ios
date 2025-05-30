@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            color: #333;
+            position: relative;
+        }
+        h1 {
+            color: #4a5568;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        p {
+            color: #718096;
+            margin-bottom: 30px;
+        }
+        .button {
+            display: block;
+            width: 100%;
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-decoration: none;
+            margin: 15px 0;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+        .button.secondary {
+            background: #a0aec0;
+        }
+        .button.secondary:hover {
+            background: #718096;
+        }
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+        }
+        .offer-badge {
+            background: #38a169;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="close-btn" onclick="aepBridge.closeMessage()">&times;</button>
+        
+        <div class="offer-badge">Limited Time</div>
+        <h1>Special Offer!</h1>
+        <p>Get 25% off your next purchase. This offer expires soon!</p>
+        
+        <!-- Simple button clicks - no error handling needed! -->
+        <button class="button" onclick="aepBridge.logClick('offer_accepted'); aepBridge.closeMessage();">
+            Accept Offer
+        </button>
+        
+        <button class="button secondary" onclick="aepBridge.logClick('offer_declined'); aepBridge.closeMessage();">
+            No Thanks
+        </button>
+        
+        <!-- Custom event logging is also simple -->
+        <button class="button" onclick="aepBridge.logCustomEvent('newsletter_signup', {source: 'offer_popup'});">
+            Subscribe to Newsletter
+        </button>
+        
+        <!-- Push permission request -->
+        <button class="button" onclick="aepBridge.requestPushPermission();">
+            Enable Notifications
+        </button>
+    </div>
+
+    <script>
+        // Optional: Listen for bridge ready event if you need to do something when it's available
+        window.addEventListener('aep.BridgeReady', function() {
+            console.log('Bridge is ready!');
+            
+            // Track that the offer was shown
+            aepBridge.logCustomEvent('offer_displayed', {
+                timestamp: new Date().toISOString(),
+                offer_type: 'discount'
+            });
+        });
+        
+        // That's it! No complex error handling or safety checks needed.
+        // The bridge handles all of that automatically.
+    </script>
+</body>
+</html> 
