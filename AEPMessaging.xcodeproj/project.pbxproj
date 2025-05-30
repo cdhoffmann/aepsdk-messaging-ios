@@ -199,6 +199,7 @@
 		56B08B522365B6DC2B556B40 /* Pods_UnitTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D685E0AE5C614B4788DE869A /* Pods_UnitTests.framework */; };
 		7500AC902DE8B0E600C07069 /* MessagingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7500AC8F2DE8B0E600C07069 /* MessagingBridge.swift */; };
 		75B4333CC0B4F5BFAC707055 /* Pods_MessagingDemoAppObjC.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28E46BC7A8F3939CF2DDDC8F /* Pods_MessagingDemoAppObjC.framework */; };
+		75F69B192DEA17CD008D5DB7 /* bareBonesTest.html in Resources */ = {isa = PBXBuildFile; fileRef = 75F69B182DEA17CD008D5DB7 /* bareBonesTest.html */; };
 		899E1724E9B5AD078B0710E5 /* Pods_IntegrationTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CA09063EA0248339C5B2C535 /* Pods_IntegrationTests.framework */; };
 		8C4723D49BD3F1EB4060FEAE /* Pods_FunctionalTestApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DB9F1A791A757B3C68D23B9D /* Pods_FunctionalTestApp.framework */; };
 		8DEEA93D16C40CA285E20AD5 /* Pods_MessagingDemoAppSwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 91A11E37A49E14EB847FB2DF /* Pods_MessagingDemoAppSwiftUI.framework */; };
@@ -638,6 +639,7 @@
 		53FA287A1BFC0714D83A6419 /* Pods-UnitTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-UnitTests.debug.xcconfig"; path = "Target Support Files/Pods-UnitTests/Pods-UnitTests.debug.xcconfig"; sourceTree = "<group>"; };
 		69F23BE01498B5A36EEE4CDC /* Pods_MessagingDemoApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_MessagingDemoApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		7500AC8F2DE8B0E600C07069 /* MessagingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingBridge.swift; sourceTree = "<group>"; };
+		75F69B182DEA17CD008D5DB7 /* bareBonesTest.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = bareBonesTest.html; path = AEPMessaging/Tests/Resources/bareBonesTest.html; sourceTree = SOURCE_ROOT; };
 		7BB455BF61D9D261AC490547 /* Pods-MessagingDemoAppSwiftUI.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MessagingDemoAppSwiftUI.debug.xcconfig"; path = "Target Support Files/Pods-MessagingDemoAppSwiftUI/Pods-MessagingDemoAppSwiftUI.debug.xcconfig"; sourceTree = "<group>"; };
 		91A11E37A49E14EB847FB2DF /* Pods_MessagingDemoAppSwiftUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_MessagingDemoAppSwiftUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		92085982251BEB7100B9C65A /* MessagingDemoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MessagingDemoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -926,6 +928,7 @@
 			isa = PBXGroup;
 			children = (
 				B6F7CC102CC2EF3C00C35C64 /* UI */,
+				75F69B182DEA17CD008D5DB7 /* bareBonesTest.html */,
 				09265D5C2B74497E0085D825 /* codeBasedPropositionHtml.json */,
 				09265D5D2B74497E0085D825 /* codeBasedPropositionHtmlContent.json */,
 				09265D5F2B74497E0085D825 /* codeBasedPropositionJson.json */,
@@ -1974,6 +1977,7 @@
 				B6F7CCC62CCA1D7C00C35C64 /* NoCard.json in Resources */,
 				B6F7CCC72CCA1D7C00C35C64 /* MultipleCards.json in Resources */,
 				B6F7CCC42CCA1D7100C35C64 /* small image no title.json in Resources */,
+				75F69B192DEA17CD008D5DB7 /* bareBonesTest.html in Resources */,
 				B6F7CCC52CCA1D7100C35C64 /* small image no image.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
