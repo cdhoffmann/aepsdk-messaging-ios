@@ -67,11 +67,13 @@ public class MessagingBridge: NSObject {
             webkit.messageHandlers.aepLogClick.postMessage(buttonId || "");
         };
         """
-        let userScript = WKUserScript(
-            source: bridgeScript,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: true
-        )
-        webView.configuration.userContentController.addUserScript(userScript)
+        DispatchQueue.main.async {
+            let userScript = WKUserScript(
+                source: bridgeScript,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            )
+            webView.configuration.userContentController.addUserScript(userScript)
+        }
     }
 } 

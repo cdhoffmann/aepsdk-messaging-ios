@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             if !Constants.assuranceURL.isEmpty {
                 Assurance.startSession(url: URL(string: Constants.assuranceURL)!)
             } else {
-                Assurance.startSession()
+                //Assurance.startSession()
             }
             
             self.registerForPushNotifications(application)
